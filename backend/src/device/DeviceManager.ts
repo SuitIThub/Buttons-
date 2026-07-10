@@ -269,12 +269,13 @@ export class DeviceManager {
       console.warn("[Deploy] Verification failed - using pushed config:", err);
     }
 
-    // 5. Runtime aktivieren (nach Deploy immer auf der ersten Seite starten).
+    // 5. Runtime aktivieren. KEIN erzwungener Seitenwechsel hier – ein Sprung
+    //    während das Gerät nach dem Config-Push neu bootet führt zu Desync
+    //    (Display/Buttons auf verschiedenen Seiten). Die aktuelle Seite bleibt;
+    //    der Rücksprung zur Hauptseite übernimmt der Idle-Timer.
     console.log("[Deploy] Activating runtime...");
     this.syncVars();
-    this.runtime.activate(output, this.store.getScenes(), this.store.getNav(), this.store.getPages(), {
-      resetPage: true,
-    });
+    this.runtime.activate(output, this.store.getScenes(), this.store.getNav(), this.store.getPages());
 
     // 6. Device synchronisieren und rendern
     console.log("[Deploy] Syncing device page...");

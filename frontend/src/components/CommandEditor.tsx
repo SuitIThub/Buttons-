@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Command, CommandResult, CommandType, DisplayElement, EventGroup, HttpMethod, ListMode, SensorInfo, VariableDef } from "../lib/types";
 import { api } from "../lib/api";
+import { uid } from "../lib/uid";
 import { Button, Input, Select } from "./ui";
 import { IconPicker } from "./IconPicker";
 import {
@@ -565,6 +566,27 @@ export function CommandEditor({ commands, variables, groups, scene, selfGroupId,
     onChange(next);
   };
 
+  /** Dupliziert einen Befehl; bei Block-Öffnern den gesamten Block (mit End-Marker). */
+  const duplicate = (idx: number) => {
+    const c = commands[idx];
+    let block: Command[];
+    let at: number;
+    if (isOpener(c.type)) {
+      const end = matchingCloserIndex(commands, idx);
+      if (end < 0) return;
+      block = commands.slice(idx, end + 1);
+      at = end + 1;
+    } else {
+      block = [c];
+      at = idx + 1;
+    }
+    // Tiefe Kopie mit neuen IDs (props/verschachtelte Felder nicht teilen).
+    const clones = block.map((cmd) => ({ ...(JSON.parse(JSON.stringify(cmd)) as Command), id: uid() }));
+    const next = [...commands];
+    next.splice(at, 0, ...clones);
+    onChange(next);
+  };
+
   const onDrop = (target: number) => {
     if (dragIdx === null || dragIdx === target) return;
     move(dragIdx, dragIdx < target ? target - 1 : target);
@@ -637,6 +659,9 @@ export function CommandEditor({ commands, variables, groups, scene, selfGroupId,
               <div className="ml-auto flex items-center gap-1">
                 <button onClick={() => move(idx, idx - 1)} className="rounded px-1.5 text-slate-500 hover:bg-white/10 hover:text-slate-200" title="Hoch">↑</button>
                 <button onClick={() => move(idx, idx + 1)} className="rounded px-1.5 text-slate-500 hover:bg-white/10 hover:text-slate-200" title="Runter">↓</button>
+                {!isMarker(c.type) && (
+                  <button onClick={() => duplicate(idx)} className="rounded px-1.5 text-slate-500 hover:bg-white/10 hover:text-slate-200" title={isOpener(c.type) ? "Block duplizieren" : "Duplizieren"}>⧉</button>
+                )}
                 {isOpener(c.type) && <InlineAdd onPick={(t) => insertAt(t, idx + 1)} />}
                 <button onClick={() => remove(idx)} className="rounded px-1.5 text-red-300 hover:bg-red-500/20" title="Löschen">✕</button>
               </div>

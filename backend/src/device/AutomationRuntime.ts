@@ -144,7 +144,6 @@ export class AutomationRuntime extends EventEmitter {
     scenes: Scene[],
     nav: NavSettings,
     pages: Page[] = [],
-    opts: { resetPage?: boolean } = {},
   ): void {
     this.deactivate();
     this.device.resetPublishCache();
@@ -168,9 +167,9 @@ export class AutomationRuntime extends EventEmitter {
     this.homePageIndex = homePage ? homePage.order : -1;
     this.homeTimeoutMs = Math.max(0, (nav.homeTimeoutSeconds ?? 0)) * 1000;
 
-    // Nach einem Deploy immer auf der ersten Seite starten (die Hauptseite muss
-    // nicht die erste sein). Sonst den aktuellen Seiten-Index beibehalten.
-    if (opts.resetPage) this.currentPage = 0;
+    // Aktuellen Seiten-Index beibehalten (nur bei ungültigem Index auf 0). Kein
+    // erzwungener Seitenwechsel beim (Re-)Aktivieren – das würde beim Deploy
+    // während des Geräte-Reboots zu Display/Button-Desync führen.
     if (this.currentPage >= this.scenesByPage.length) this.currentPage = 0;
 
     this.renderConfig = this.buildRenderConfig();
@@ -1176,6 +1175,7 @@ export class AutomationRuntime extends EventEmitter {
     if (this.homePageIndex < 0 || this.homePageIndex >= this.scenesByPage.length) return;
     if (this.currentPage === this.homePageIndex) return;
 
+    console.log(`[Runtime] Idle-Timer → Hauptseite (Index ${this.homePageIndex}) in ${Math.round(this.homeTimeoutMs / 1000)}s`);
     this.idleTimer = setTimeout(() => {
       this.idleTimer = null;
       if (this.active && this.currentPage !== this.homePageIndex &&

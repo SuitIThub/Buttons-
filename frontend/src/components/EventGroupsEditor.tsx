@@ -27,6 +27,21 @@ export function EventGroupsEditor({ sceneId, groups, variables, scene, dirty, re
     onChange(groups.map((g) => (g.id === id ? { ...g, ...patch } : g)));
   const remove = (id: string) => onChange(groups.filter((g) => g.id !== id));
 
+  const duplicate = (id: string) => {
+    const idx = groups.findIndex((g) => g.id === id);
+    if (idx < 0) return;
+    const g = groups[idx];
+    const copy: EventGroup = {
+      id: uid(),
+      name: `${g.name} (Kopie)`,
+      // Tiefe Kopie der Befehle mit neuen IDs.
+      commands: g.commands.map((c) => ({ ...JSON.parse(JSON.stringify(c)), id: uid() })),
+    };
+    const next = [...groups];
+    next.splice(idx + 1, 0, copy);
+    onChange(next);
+  };
+
   const run = async (id: string) => {
     if (dirty) {
       onToast("Bitte zuerst speichern, dann ausführen.");
@@ -66,6 +81,7 @@ export function EventGroupsEditor({ sceneId, groups, variables, scene, dirty, re
               <span className="text-xs text-slate-500">{g.commands.length} Befehle</span>
               <div className="ml-auto flex gap-2">
                 <Button variant="ghost" onClick={() => run(g.id)}>Jetzt ausführen</Button>
+                <Button variant="ghost" onClick={() => duplicate(g.id)}>Duplizieren</Button>
                 <Button variant="danger" onClick={() => remove(g.id)}>Löschen</Button>
               </div>
             </div>
