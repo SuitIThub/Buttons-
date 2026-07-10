@@ -2,6 +2,7 @@ import { BPConnector, ButtonBinding, EventGroup, Trigger } from "../lib/types";
 import { Button, Field, Input } from "./ui";
 import { ConnectorType, connectorLabel, mapButtons } from "../lib/helpers";
 import { IconPicker } from "./IconPicker";
+import { uid } from "../lib/uid";
 
 interface Props {
   buttons: ButtonBinding[];
@@ -36,7 +37,7 @@ export function ButtonsConfig({ buttons, connectors, groups, triggers, onChange,
   const addTrigger = (id: number) =>
     onTriggersChange([
       ...triggers,
-      { id: crypto.randomUUID(), type: "button", buttonId: id, press: "click", groupId: "", condition: "" },
+      { id: uid(), type: "button", buttonId: id, press: "click", groupId: "", condition: "" },
     ]);
   const updateTrigger = (tid: string, patch: Partial<Trigger>) =>
     onTriggersChange(triggers.map((t) => (t.id === tid ? { ...t, ...patch } : t)));

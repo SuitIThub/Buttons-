@@ -1,4 +1,5 @@
 import { Command, CommandType } from "./types";
+import { uid } from "./uid";
 
 /** Kategorie-Gruppierung für das „Befehl hinzufügen"-Menü. */
 export interface CommandMeta {
@@ -96,7 +97,7 @@ export function commandLabel(type: CommandType): string {
 }
 
 export function newCommand(type: CommandType): Command {
-  const base: Command = { id: crypto.randomUUID(), type };
+  const base: Command = { id: uid(), type };
   if (type === "mathOp") base.mathMode = "round";
   if (type === "httpRequest") base.responseMode = "json";
   if (type === "formatNumber") base.pattern = "00.00";

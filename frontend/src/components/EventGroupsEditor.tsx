@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { CommandResult, EventGroup, VariableDef } from "../lib/types";
 import { Button, Input } from "./ui";
 import { CommandEditor, SceneContext } from "./CommandEditor";
+import { uid } from "../lib/uid";
 
 interface Props {
   sceneId: string;
@@ -16,7 +17,7 @@ interface Props {
 }
 
 function newGroup(index: number): EventGroup {
-  return { id: crypto.randomUUID(), name: `Gruppe ${index + 1}`, commands: [] };
+  return { id: uid(), name: `Gruppe ${index + 1}`, commands: [] };
 }
 
 export function EventGroupsEditor({ sceneId, groups, variables, scene, dirty, results, onChange, onToast }: Props) {

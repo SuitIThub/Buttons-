@@ -1,5 +1,6 @@
 import { EventGroup, Trigger, TriggerType, VariableDef } from "../lib/types";
 import { Button, Input, Select } from "./ui";
+import { uid } from "../lib/uid";
 
 interface Props {
   triggers: Trigger[];
@@ -22,7 +23,7 @@ const TRIGGER_TYPES: { value: TriggerType; label: string }[] = [
 ];
 
 function newTrigger(): Trigger {
-  return { id: crypto.randomUUID(), type: "page_enter", groupId: "", condition: "" };
+  return { id: uid(), type: "page_enter", groupId: "", condition: "" };
 }
 
 export function TriggerEditor({ triggers, groups, variables, onChange }: Props) {

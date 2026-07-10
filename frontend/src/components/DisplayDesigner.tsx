@@ -4,6 +4,7 @@ import { Button, Field, Input, Select } from "./ui";
 import { ALIGN_OPTIONS, FONT_PX, FONT_SIZES, alignToAnchorTransform, alignToCss } from "../lib/uiConstants";
 import { previewFormatValue, previewInterpolate } from "../lib/interp";
 import { IconPicker } from "./IconPicker";
+import { uid } from "../lib/uid";
 
 interface Props {
   elements: DisplayElement[];
@@ -50,7 +51,7 @@ export function DisplayDesigner({ elements, onChange, runtimeVars }: Props) {
 
   const addElement = () => {
     const el: DisplayElement = {
-      id: crypto.randomUUID(),
+      id: uid(),
       x: 10,
       y: 12,
       width: 80,
