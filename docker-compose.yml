@@ -3,9 +3,9 @@ services:
     build: .
     container_name: buttonplus-manager
     ports:
-      - "8080:8080"
+      - "6789:6789"
     environment:
-      PORT: 8080
+      PORT: 6789
       # Diese Werte können auch später in der Weboberfläche gesetzt werden.
       BUTTONPLUS_DEVICE_IP: ${BUTTONPLUS_DEVICE_IP:-}
       MQTT_URL: ${MQTT_URL:-}

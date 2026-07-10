@@ -34,6 +34,9 @@ export const api = {
 
   pullConfig: () => req<{ config: unknown }>("/api/config/pull", { method: "POST" }),
   getSensors: () => req<SensorInfo[]>("/api/sensors"),
+
+  importConfig: (data: unknown) =>
+    req<{ ok: boolean }>("/api/import", { method: "POST", body: JSON.stringify(data) }),
   deploy: () =>
     req<{ ok: boolean; pages: number; buttons: number; displays: number }>("/api/deploy", {
       method: "POST",

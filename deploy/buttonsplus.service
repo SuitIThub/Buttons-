@@ -1,0 +1,36 @@
+[Unit]
+Description=Buttons+ Manager (git pull + docker compose up)
+# Erst starten, wenn Docker und das Netzwerk bereit sind.
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# --- An deine Umgebung anpassen -------------------------------------------
+# Benutzer, dem das Repo gehört und der in der Gruppe "docker" ist.
+User=youruser
+Group=docker
+# Verzeichnis des geklonten Repos (enthält docker-compose.yml).
+WorkingDirectory=/opt/buttonsplus
+# --------------------------------------------------------------------------
+
+# Image-Build kann dauern -> kein Start-Timeout.
+TimeoutStartSec=0
+
+# 1) Repo aktualisieren. Das "-" macht es best-effort: ist der Server offline
+#    oder gibt es lokale Aenderungen, blockiert das den Start NICHT; es laeuft
+#    dann einfach mit dem vorhandenen Stand weiter.
+ExecStartPre=-/usr/bin/git pull --ff-only
+
+# 2) Container (neu) bauen und im Hintergrund starten. --build zieht die frisch
+#    gepullten Code-Aenderungen ins Image.
+ExecStart=/usr/bin/docker compose up -d --build
+
+# Beim Stoppen/Neustart des Dienstes die Container sauber herunterfahren.
+ExecStop=/usr/bin/docker compose down
+
+[Install]
+WantedBy=multi-user.target

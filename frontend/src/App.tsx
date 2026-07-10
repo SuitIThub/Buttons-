@@ -81,6 +81,10 @@ export default function App() {
     await refreshStatus();
   }, [refreshPages, refreshStatus]);
 
+  const reloadAll = useCallback(async () => {
+    await Promise.all([refreshStatus(), refreshPages(), refreshScenes(), refreshVariables()]);
+  }, [refreshStatus, refreshPages, refreshScenes, refreshVariables]);
+
   const openScene = useCallback((sceneId: string) => {
     setTab("scenes");
     setOpenSceneId(sceneId);
@@ -244,6 +248,10 @@ export default function App() {
               onSaved={async () => {
                 await refreshStatus();
                 showToast("Einstellungen gespeichert.");
+              }}
+              onImported={async () => {
+                await reloadAll();
+                showToast("Konfiguration importiert.");
               }}
               onPull={pullFromDevice}
               onDeploy={deploy}

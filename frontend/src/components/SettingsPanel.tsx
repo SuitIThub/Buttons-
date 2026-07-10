@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavSettings, Page, Settings, StatusResponse } from "../lib/types";
 import { api } from "../lib/api";
 import { Button, Card, Field, Input, Select } from "./ui";
@@ -8,6 +8,7 @@ export function SettingsPanel({
   status,
   pages,
   onSaved,
+  onImported,
   onPull,
   onDeploy,
   onError,
@@ -15,10 +16,38 @@ export function SettingsPanel({
   status: StatusResponse | null;
   pages: Page[];
   onSaved: () => void;
+  onImported: () => void;
   onPull: () => void;
   onDeploy: () => void;
   onError: (msg: string) => void;
 }) {
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  const exportConfig = async () => {
+    try {
+      const res = await fetch("/api/export");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `buttonsplus-config-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      onError(`Export fehlgeschlagen: ${(e as Error).message}`);
+    }
+  };
+
+  const importConfig = async (file: File) => {
+    try {
+      const data = JSON.parse(await file.text());
+      await api.importConfig(data);
+      onImported();
+    } catch (e) {
+      onError(`Import fehlgeschlagen: ${(e as Error).message}`);
+    }
+  };
   const [form, setForm] = useState<Settings>({
     deviceIp: "",
     mqttUrl: "",
@@ -127,6 +156,30 @@ export function SettingsPanel({
             „Deployen“ übersetzt Seiten, Szenen und Logik automatisch in die Gerätekonfiguration und
             alle MQTT-Topics – du musst dich nie mit Topics befassen.
           </p>
+
+          <div className="mt-3 border-t border-white/10 pt-3">
+            <p className="mb-2 text-xs font-medium text-slate-400">Konfiguration sichern</p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="ghost" onClick={exportConfig}>Exportieren</Button>
+              <Button variant="ghost" onClick={() => importInputRef.current?.click()}>Importieren</Button>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void importConfig(file);
+                  e.target.value = ""; // gleiche Datei erneut wählbar machen
+                }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              Sichert bzw. lädt die komplette Konfiguration (Seiten, Szenen, Variablen, Einstellungen).
+              Import <span className="text-amber-300">ersetzt</span> alles und enthält Zugangsdaten im
+              Klartext. Danach „Auf Gerät deployen“, um die Änderungen aufs Gerät zu bringen.
+            </p>
+          </div>
         </Card>
 
         <Card title="Navigation (Display-Modul)">

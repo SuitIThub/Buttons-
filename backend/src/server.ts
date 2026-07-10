@@ -94,6 +94,27 @@ export async function buildServer(manager: DeviceManager): Promise<Server> {
   // Integrierte Sensoren (für die sensorRead-Auswahl in der UI).
   api.get("/sensors", asyncHandler(async (_req, res) => res.json(manager.getSensors())));
 
+  // ---- Export / Import der gesamten Konfiguration --------------------------
+  api.get(
+    "/export",
+    asyncHandler(async (_req, res) => {
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      res.setHeader("Content-Disposition", `attachment; filename="buttonsplus-config-${stamp}.json"`);
+      res.json(manager.store.exportData());
+    }),
+  );
+
+  api.post(
+    "/import",
+    asyncHandler(async (req, res) => {
+      await manager.store.importData(req.body);
+      manager.reconnectMqtt();
+      manager.startRuntime();
+      manager.markUndeployed();
+      res.json({ ok: true });
+    }),
+  );
+
   // ---- Deploy: Modell -> Gerät ---------------------------------------------
   api.post(
     "/deploy",

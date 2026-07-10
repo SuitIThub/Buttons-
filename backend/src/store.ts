@@ -169,6 +169,46 @@ export class Store {
     await fs.writeFile(this.file, JSON.stringify(this.data, null, 2), "utf-8");
   }
 
+  // ---- Export / Import ------------------------------------------------------
+
+  /** Vollständiger Konfig-Snapshot (für Backup/Umzug). Enthält auch Credentials. */
+  exportData(): StoreData {
+    return JSON.parse(JSON.stringify(this.data)) as StoreData;
+  }
+
+  /**
+   * Ersetzt die gesamte Konfiguration durch einen Import (wie exportData liefert)
+   * und wendet dieselbe Normalisierung/Heilung wie beim Laden an. Persistiert
+   * sofort. Wirft bei inkompatiblem Schema.
+   */
+  async importData(raw: unknown): Promise<void> {
+    if (!raw || typeof raw !== "object") throw new Error("Import-Daten sind kein Objekt.");
+    const parsed = raw as Partial<StoreData>;
+    if (!Array.isArray(parsed.scenes) && !Array.isArray(parsed.pages) && !parsed.settings) {
+      throw new Error("Import-Daten sehen nicht wie ein Buttons+-Export aus.");
+    }
+    if (typeof parsed.schema === "number" && parsed.schema < SCHEMA_VERSION) {
+      throw new Error(
+        `Import-Schema ${parsed.schema} ist inkompatibel (erwartet ${SCHEMA_VERSION}). Bitte mit einer aktuellen Version exportieren.`,
+      );
+    }
+
+    const envDefaults = loadEnvSettings();
+    this.data.schema = SCHEMA_VERSION;
+    this.data.settings = mergeSettings(parsed.settings, envDefaults);
+    this.data.pages = parsed.pages ?? [];
+    this.data.scenes = (parsed.scenes ?? []).map((s) => ({
+      ...s,
+      triggers: s.triggers ?? [],
+      display: normalizeSceneDisplay(s.display ?? []),
+    }));
+    this.data.variables = parsed.variables ?? [];
+    this.data.nav = { ...DEFAULT_NAV, ...parsed.nav };
+    this.data.varValues = parsed.varValues ?? {};
+    this.ensureModelIntegrity();
+    await this.persist();
+  }
+
   // ---- Einstellungen --------------------------------------------------------
   getSettings(): AppSettings {
     return { ...this.data.settings };
