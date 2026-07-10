@@ -1,0 +1,19 @@
+services:
+  buttonplus-manager:
+    build: .
+    container_name: buttonplus-manager
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      # Diese Werte können auch später in der Weboberfläche gesetzt werden.
+      BUTTONPLUS_DEVICE_IP: ${BUTTONPLUS_DEVICE_IP:-}
+      MQTT_URL: ${MQTT_URL:-}
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_BASE_TOPIC: ${MQTT_BASE_TOPIC:-buttonplus}
+      BUTTONPLUS_DEVICE_ID: ${BUTTONPLUS_DEVICE_ID:-}
+      DATA_DIR: /app/data
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

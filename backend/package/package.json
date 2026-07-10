@@ -1,0 +1,53 @@
+{
+  "name": "@nielseulink/node-red-contrib-buttonplus",
+  "version": "1.0.6",
+  "description": "Node-RED nodes for controlling Button+ devices via MQTT",
+  "main": "nodes/buttonplus-config.js",
+  "scripts": {
+    "test": "mocha test/**/*.js"
+  },
+  "keywords": [
+    "node-red",
+    "buttonplus",
+    "mqtt",
+    "home-automation",
+    "iot"
+  ],
+  "author": "Niels Eulink <nielseulink@users.noreply.github.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nielseulink/buttonplus-nodered.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nielseulink/buttonplus-nodered/issues"
+  },
+  "homepage": "https://github.com/nielseulink/buttonplus-nodered#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "node-red": {
+    "version": ">=3.0.0",
+    "nodes": {
+      "buttonplus-config": "nodes/buttonplus-config.js",
+      "buttonplus-led": "nodes/buttonplus-led.js",
+      "buttonplus-button": "nodes/buttonplus-button.js",
+      "buttonplus-update-button": "nodes/buttonplus-update-button.js",
+      "buttonplus-update-display": "nodes/buttonplus-update-display.js",
+      "buttonplus-update-global": "nodes/buttonplus-update-global.js"
+    }
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "mocha": "^10.8.2",
+    "node-red": "^4.0.0",
+    "node-red-node-test-helper": "^0.3.4"
+  },
+  "files": [
+    "nodes/",
+    "resources/",
+    "examples/",
+    "README.md",
+    "LICENSE"
+  ]
+}

@@ -1,0 +1,157 @@
+<script type="text/javascript" src="resources/@nielseulink/node-red-contrib-buttonplus/buttonplus-editor.js"></script>
+<script type="text/javascript">
+    function bpToggleLedFields(ledSelector, fieldSelectors) {
+        const ledInput = $(ledSelector);
+        const rows = fieldSelectors.map(function (sel) {
+            return $(sel).closest('.form-row');
+        });
+
+        function update() {
+            const show = ledInput.val() !== 'none';
+            rows.forEach(function (row) {
+                row.toggle(show);
+            });
+        }
+
+        ledInput.on('change', update);
+        update();
+    }
+
+    RED.nodes.registerType('buttonplus-update-button', {
+        category: 'buttonplus',
+        color: '#DDAA99',
+        defaults: {
+            name: { value: '' },
+            config: { value: '', type: 'buttonplus-config', required: true },
+            page: { value: 1, validate: RED.validators.number() },
+            button: { value: 1, validate: RED.validators.number() },
+            labelText: { value: '' },
+            valueText: { value: '' },
+            svgText: { value: '' },
+            led: { value: 'none' },
+            ledColor: { value: '#a10303' },
+            ledDuration: { value: 'none' },
+            outputProperties: { value: [] }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: 'font-awesome/fa-info-circle',
+        label: function () {
+            return this.name || `Button+ update button ${this.button}-${this.page}`;
+        },
+        paletteLabel: 'Button+ update button',
+        oneditprepare: function () {
+            bpToggleLedFields('#node-input-led', [
+                '#node-input-ledColor',
+                '#node-input-ledDuration'
+            ]);
+            bpPrepareActionOutputProperties(this);
+        },
+        oneditsave: function () {
+            bpSaveOutputProperties(this);
+        },
+        oneditresize: bpResizeOutputProperties
+    });
+</script>
+
+<script type="text/html" data-template-name="buttonplus-update-button">
+    <div class="form-row">
+        <label for="node-input-name">Name</label>
+        <input type="text" id="node-input-name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-config">Config</label>
+        <input type="text" id="node-input-config">
+    </div>
+    <div class="form-row">
+        <label for="node-input-page">Page</label>
+        <input type="number" id="node-input-page" min="1">
+    </div>
+    <div class="form-row">
+        <label for="node-input-button">Button</label>
+        <input type="number" id="node-input-button" min="1">
+    </div>
+    <div class="form-row">
+        <label for="node-input-labelText">Top label</label>
+        <input type="text" id="node-input-labelText">
+    </div>
+    <div class="form-row">
+        <label for="node-input-valueText">Value label</label>
+        <input type="text" id="node-input-valueText">
+    </div>
+    <div class="form-row">
+        <label for="node-input-svgText">SVG</label>
+        <input type="text" id="node-input-svgText">
+    </div>
+    <div class="form-row">
+        <label for="node-input-led">LED</label>
+        <select id="node-input-led">
+            <option value="none">none</option>
+            <option value="front">front</option>
+            <option value="wall">wall</option>
+            <option value="both">front + wall</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-input-ledColor">LED color</label>
+        <input type="text" id="node-input-ledColor">
+    </div>
+    <div class="form-row">
+        <label for="node-input-ledDuration">LED duration</label>
+        <select id="node-input-ledDuration">
+            <option value="none">Steady</option>
+            <option value="0.5">0.5 sec</option>
+            <option value="1">1 sec</option>
+        </select>
+    </div>
+    <div class="form-row node-input-output-properties-container-row">
+        <label>Output properties</label>
+        <ol id="node-input-output-properties-container"></ol>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="buttonplus-update-button">
+    <p>Updates a Button+ button top label, value label and SVG via MQTT. Optionally activates the button LED.</p>
+    <p>Each incoming message updates the button labels, SVG and LED. Empty node configuration values are published as empty strings to clear the device.</p>
+    <h3>Output properties</h3>
+    <p>Add output mappings to extend the outgoing message. With an empty list the input message is passed through unchanged.</p>
+    <p>Available source:</p>
+    <dl class="message-properties">
+        <dt>buttonplus_debug <span class="property-type">object</span></dt>
+        <dd>Debug info with the incoming message in <code>input</code> and all MQTT messages sent in <code>mqtt</code>.</dd>
+    </dl>
+    <h3>Override precedence</h3>
+    <p><code>msg</code> property &gt; node configuration. Device id comes from the linked Button+ config node.</p>
+    <h3>Input message properties</h3>
+    <dl class="message-properties">
+        <dt>page <span class="property-type">number</span></dt>
+        <dd>Button page number.</dd>
+        <dt>button <span class="property-type">number</span></dt>
+        <dd>Button number on the page.</dd>
+        <dt>label <span class="property-type">string</span></dt>
+        <dd>Top label text. Empty clears the label on the device.</dd>
+        <dt>value <span class="property-type">string</span></dt>
+        <dd>Main button label/value text. Empty clears the value on the device.</dd>
+        <dt>svg <span class="property-type">string</span></dt>
+        <dd>Button SVG content. Empty clears the SVG on the device.</dd>
+        <dt>led <span class="property-type">string</span></dt>
+        <dd><code>none</code> zet beide LED's uit. <code>front</code>, <code>wall</code> of <code>both</code> licht op na de update.</dd>
+        <dt>led_color <span class="property-type">string</span></dt>
+        <dd>LED color.</dd>
+        <dt>led_delay <span class="property-type">string | number</span></dt>
+        <dd>LED timing. Use <code>steady</code> or <code>none</code> to keep the LED on. Use <code>0.5</code>, <code>1</code> or any positive number of seconds for a pulse.</dd>
+        <dt>led_brightness <span class="property-type">number</span></dt>
+        <dd>LED brightness from 0 to 100.</dd>
+    </dl>
+    <h3>MQTT topics</h3>
+    <p>Published to:</p>
+    <ul>
+        <li><code>{prefix}/{device}/button/{button}-{page}/toplabel/set</code></li>
+        <li><code>{prefix}/{device}/button/{button}-{page}/label/set</code></li>
+        <li><code>{prefix}/{device}/button/{button}-{page}/svg/set</code></li>
+        <li><code>{prefix}/{device}/button/{button}-{page}/led/{led}/rgb/set</code></li>
+        <li><code>{prefix}/{device}/button/{button}-{page}/led/{led}/brightness/set</code></li>
+        <li><code>{prefix}/{device}/button/{button}-{page}/led/{led}/on/set</code></li>
+    </ul>
+    <p>LED topics worden per geselecteerde LED gebruikt. Bij <code>none</code> worden front en wall uitgezet.</p>
+</script>

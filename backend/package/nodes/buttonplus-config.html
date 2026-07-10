@@ -1,0 +1,65 @@
+<script type="text/javascript">
+    RED.nodes.registerType('buttonplus-config', {
+        category: 'config',
+        defaults: {
+            name: { value: '' },
+            broker: { value: '', type: 'mqtt-broker', required: true },
+            prefix: { value: 'buttonplus', required: true },
+            device: { value: '' },
+            qos: { value: 0 },
+            retain: { value: false }
+        },
+        label: function () {
+            return this.name || 'Button+ config';
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="buttonplus-config">
+    <div class="form-row">
+        <label for="node-config-input-name">Name</label>
+        <input type="text" id="node-config-input-name" placeholder="Button+">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-broker">MQTT broker</label>
+        <input type="text" id="node-config-input-broker">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-prefix">Topic prefix</label>
+        <input type="text" id="node-config-input-prefix" placeholder="buttonplus">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-device">Device</label>
+        <input type="text" id="node-config-input-device" placeholder="buttonplus_1">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-qos">Default QoS</label>
+        <select id="node-config-input-qos">
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-retain">Retain</label>
+        <input type="checkbox" id="node-config-input-retain" style="width:auto">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="buttonplus-config">
+    <p>Shared Button+ configuration linked to an existing <code>mqtt-broker</code> config node.</p>
+    <p>This node stores Button+-specific defaults used by all linked Button+ nodes.</p>
+    <h3>Settings</h3>
+    <dl class="message-properties">
+        <dt>MQTT broker <span class="property-type">mqtt-broker</span></dt>
+        <dd>Existing Node-RED MQTT broker configuration.</dd>
+        <dt>Topic prefix <span class="property-type">string</span></dt>
+        <dd>Base MQTT topic prefix. Default: <code>buttonplus</code>.</dd>
+        <dt>Device <span class="property-type">string</span></dt>
+        <dd>Button+ device id, for example <code>buttonplus_1</code>. Used by all linked Button+ nodes.</dd>
+        <dt>Default QoS <span class="property-type">number</span></dt>
+        <dd>QoS level for all Button+ MQTT publishes and subscribes.</dd>
+        <dt>Retain <span class="property-type">boolean</span></dt>
+        <dd>Retain flag for all Button+ MQTT publishes.</dd>
+    </dl>
+</script>

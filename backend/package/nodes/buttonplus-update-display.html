@@ -1,0 +1,101 @@
+<script type="text/javascript" src="resources/@nielseulink/node-red-contrib-buttonplus/buttonplus-editor.js"></script>
+<script type="text/javascript">
+    RED.nodes.registerType('buttonplus-update-display', {
+        category: 'buttonplus',
+        color: '#DDAA99',
+        defaults: {
+            name: { value: '' },
+            config: { value: '', type: 'buttonplus-config', required: true },
+            item: { value: 1, validate: RED.validators.number() },
+            label: { value: '' },
+            value: { value: '' },
+            unit: { value: '' },
+            svg: { value: '' },
+            outputProperties: { value: [] }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: 'font-awesome/fa-tv',
+        label: function () {
+            return this.name || `Button+ display item ${this.item}`;
+        },
+        paletteLabel: 'Button+ update display',
+        oneditprepare: function () {
+            bpPrepareActionOutputProperties(this);
+        },
+        oneditsave: function () {
+            bpSaveOutputProperties(this);
+        },
+        oneditresize: bpResizeOutputProperties
+    });
+</script>
+
+<script type="text/html" data-template-name="buttonplus-update-display">
+    <div class="form-row">
+        <label for="node-input-name">Name</label>
+        <input type="text" id="node-input-name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-config">Config</label>
+        <input type="text" id="node-input-config">
+    </div>
+    <div class="form-row">
+        <label for="node-input-item">Display item</label>
+        <input type="number" id="node-input-item" min="1">
+    </div>
+    <div class="form-row">
+        <label for="node-input-label">Label</label>
+        <input type="text" id="node-input-label">
+    </div>
+    <div class="form-row">
+        <label for="node-input-value">Value</label>
+        <input type="text" id="node-input-value">
+    </div>
+    <div class="form-row">
+        <label for="node-input-unit">Unit</label>
+        <input type="text" id="node-input-unit">
+    </div>
+    <div class="form-row">
+        <label for="node-input-svg">SVG</label>
+        <input type="text" id="node-input-svg">
+    </div>
+    <div class="form-row node-input-output-properties-container-row">
+        <label>Output properties</label>
+        <ol id="node-input-output-properties-container"></ol>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="buttonplus-update-display">
+    <p>Updates a Button+ display item via MQTT.</p>
+    <p>Each field can be published independently. Fields that are empty in both the node configuration and the incoming message are left unchanged. Use <code>msg.property = ""</code> to clear a field on the device.</p>
+    <h3>Output properties</h3>
+    <p>Add output mappings to extend the outgoing message. With an empty list the input message is passed through unchanged.</p>
+    <p>Available source:</p>
+    <dl class="message-properties">
+        <dt>buttonplus_debug <span class="property-type">object</span></dt>
+        <dd>Debug info with the incoming message in <code>input</code> and all MQTT messages sent in <code>mqtt</code>.</dd>
+    </dl>
+    <h3>Override precedence</h3>
+    <p><code>msg</code> property &gt; node configuration. Device id comes from the linked Button+ config node.</p>
+    <h3>Input message properties</h3>
+    <dl class="message-properties">
+        <dt>item <span class="property-type">number</span></dt>
+        <dd>Display item number.</dd>
+        <dt>label <span class="property-type">string</span></dt>
+        <dd>Display label text. Use <code>""</code> in <code>msg</code> to clear.</dd>
+        <dt>value <span class="property-type">string</span></dt>
+        <dd>Display value text. Use <code>""</code> in <code>msg</code> to clear.</dd>
+        <dt>unit <span class="property-type">string</span></dt>
+        <dd>Display unit text. Use <code>""</code> in <code>msg</code> to clear.</dd>
+        <dt>svg <span class="property-type">string</span></dt>
+        <dd>Display SVG content. Use <code>""</code> in <code>msg</code> to clear.</dd>
+    </dl>
+    <h3>MQTT topics</h3>
+    <p>Published to:</p>
+    <ul>
+        <li><code>{prefix}/{device}/displayitem/{item}/svg/set</code></li>
+        <li><code>{prefix}/{device}/displayitem/{item}/label/set</code></li>
+        <li><code>{prefix}/{device}/displayitem/{item}/value/set</code></li>
+        <li><code>{prefix}/{device}/displayitem/{item}/unit/set</code></li>
+    </ul>
+</script>

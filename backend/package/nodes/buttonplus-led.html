@@ -1,0 +1,140 @@
+<script type="text/javascript" src="resources/@nielseulink/node-red-contrib-buttonplus/buttonplus-editor.js"></script>
+<script type="text/javascript">
+    function bpToggleLedFields(ledSelector, fieldSelectors) {
+        const ledInput = $(ledSelector);
+        const rows = fieldSelectors.map(function (sel) {
+            return $(sel).closest('.form-row');
+        });
+
+        function update() {
+            const show = ledInput.val() !== 'none';
+            rows.forEach(function (row) {
+                row.toggle(show);
+            });
+        }
+
+        ledInput.on('change', update);
+        update();
+    }
+
+    RED.nodes.registerType('buttonplus-led', {
+        category: 'buttonplus',
+        color: '#DDAA99',
+        defaults: {
+            name: { value: '' },
+            config: { value: '', type: 'buttonplus-config', required: true },
+            page: { value: 1, validate: RED.validators.number() },
+            button: { value: 1, validate: RED.validators.number() },
+            led: { value: 'front' },
+            ledColor: { value: '#a10303' },
+            ledDuration: { value: 'none' },
+            ledBrightness: { value: 100, validate: RED.validators.number() },
+            outputProperties: { value: [] }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: 'font-awesome/fa-lightbulb-o',
+        label: function () {
+            return this.name || `Button+ LED ${this.button}-${this.page}`;
+        },
+        paletteLabel: 'Button+ LED',
+        oneditprepare: function () {
+            bpToggleLedFields('#node-input-led', [
+                '#node-input-ledColor',
+                '#node-input-ledBrightness',
+                '#node-input-ledDuration'
+            ]);
+            bpPrepareActionOutputProperties(this);
+        },
+        oneditsave: function () {
+            bpSaveOutputProperties(this);
+        },
+        oneditresize: bpResizeOutputProperties
+    });
+</script>
+
+<script type="text/html" data-template-name="buttonplus-led">
+    <div class="form-row">
+        <label for="node-input-name">Name</label>
+        <input type="text" id="node-input-name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-config">Config</label>
+        <input type="text" id="node-input-config">
+    </div>
+    <div class="form-row">
+        <label for="node-input-page">Page</label>
+        <input type="number" id="node-input-page" min="1">
+    </div>
+    <div class="form-row">
+        <label for="node-input-button">Button</label>
+        <input type="number" id="node-input-button" min="1">
+    </div>
+    <div class="form-row">
+        <label for="node-input-led">LED</label>
+        <select id="node-input-led">
+            <option value="none">none</option>
+            <option value="front">front</option>
+            <option value="wall">wall</option>
+            <option value="both">front + wall</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-input-ledColor">Color</label>
+        <input type="text" id="node-input-ledColor">
+    </div>
+    <div class="form-row">
+        <label for="node-input-ledBrightness">Brightness</label>
+        <input type="number" id="node-input-ledBrightness" min="0" max="100">
+    </div>
+    <div class="form-row">
+        <label for="node-input-ledDuration">LED duration</label>
+        <select id="node-input-ledDuration">
+            <option value="none">Steady</option>
+            <option value="0.5">0.5 sec</option>
+            <option value="1">1 sec</option>
+        </select>
+    </div>
+    <div class="form-row node-input-output-properties-container-row">
+        <label>Output properties</label>
+        <ol id="node-input-output-properties-container"></ol>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="buttonplus-led">
+    <p>Controls a Button+ button LED via MQTT.</p>
+    <p>Each incoming message triggers an LED update. By default the original message is passed to the output unchanged.</p>
+    <h3>Output properties</h3>
+    <p>Add output mappings to extend the outgoing message. With an empty list the input message is passed through unchanged.</p>
+    <p>Available source:</p>
+    <dl class="message-properties">
+        <dt>buttonplus_debug <span class="property-type">object</span></dt>
+        <dd>Debug info with the incoming message in <code>input</code> and all MQTT messages sent in <code>mqtt</code>.</dd>
+    </dl>
+    <h3>Override precedence</h3>
+    <p><code>msg</code> property &gt; node configuration. Device id comes from the linked Button+ config node.</p>
+    <p>Values such as <code>false</code>, <code>0</code> and empty strings in <code>msg</code> are respected and will not be replaced by defaults.</p>
+    <h3>Input message properties</h3>
+    <dl class="message-properties">
+        <dt>page <span class="property-type">number</span></dt>
+        <dd>Button page number.</dd>
+        <dt>button <span class="property-type">number</span></dt>
+        <dd>Button number on the page.</dd>
+        <dt>led <span class="property-type">string</span></dt>
+        <dd><code>none</code> turns both LEDs off. <code>front</code>, <code>wall</code> or <code>both</code> (front + wall) to light up.</dd>
+        <dt>led_color <span class="property-type">string</span></dt>
+        <dd>LED color, for example <code>#a10303</code>. Ignored when <code>led</code> is <code>none</code>.</dd>
+        <dt>led_brightness <span class="property-type">number</span></dt>
+        <dd>LED brightness from 0 to 100.</dd>
+        <dt>led_delay <span class="property-type">string | number</span></dt>
+        <dd>LED timing. Use <code>steady</code> or <code>none</code> to keep the LED on. Use <code>0.5</code>, <code>1</code> or any positive number of seconds for a pulse.</dd>
+    </dl>
+    <h3>MQTT topics</h3>
+    <p>Published per selected LED to:</p>
+    <ul>
+        <li><code>{prefix}/{device}/button/{button}-{page}/led/{front|wall}/rgb/set</code></li>
+        <li><code>{prefix}/{device}/button/{button}-{page}/led/{front|wall}/brightness/set</code></li>
+        <li><code>{prefix}/{device}/button/{button}-{page}/led/{front|wall}/on/set</code></li>
+    </ul>
+    <p>With <b>Steady</b>, the selected LED(s) stay on. With a duration in seconds, they pulse on and then off again.</p>
+</script>

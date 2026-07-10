@@ -1,0 +1,190 @@
+[
+    {
+        "id": "example-tab",
+        "type": "tab",
+        "label": "Button+ example",
+        "disabled": false,
+        "info": "Example flow for @nielseulink/node-red-contrib-buttonplus"
+    },
+    {
+        "id": "example-mqtt",
+        "type": "mqtt-broker",
+        "name": "Mosquitto",
+        "broker": "localhost",
+        "port": "1883",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "5",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "example-config",
+        "type": "buttonplus-config",
+        "name": "Button+",
+        "broker": "example-mqtt",
+        "prefix": "buttonplus",
+        "device": "buttonplus_1",
+        "qos": "0",
+        "retain": false
+    },
+    {
+        "id": "example-inject-led",
+        "type": "inject",
+        "z": "example-tab",
+        "name": "Pulse LED",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 150,
+        "y": 100,
+        "wires": [
+            [
+                "example-led"
+            ]
+        ]
+    },
+    {
+        "id": "example-led",
+        "type": "buttonplus-led",
+        "z": "example-tab",
+        "name": "",
+        "config": "example-config",
+        "page": 1,
+        "button": 1,
+        "led": "front",
+        "ledColor": "#a10303",
+        "ledDuration": "0.5",
+        "ledBrightness": 100,
+        "x": 390,
+        "y": 100,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "example-button",
+        "type": "buttonplus-button",
+        "z": "example-tab",
+        "name": "",
+        "config": "example-config",
+        "page": 1,
+        "button": 1,
+        "led": "front",
+        "ledColor": "#0066cc",
+        "ledDuration": 0.5,
+        "x": 390,
+        "y": 220,
+        "wires": [
+            [
+                "example-debug-short"
+            ],
+            [
+                "example-debug-long"
+            ]
+        ]
+    },
+    {
+        "id": "example-debug-short",
+        "type": "debug",
+        "z": "example-tab",
+        "name": "short press",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "x": 640,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "example-debug-long",
+        "type": "debug",
+        "z": "example-tab",
+        "name": "long press",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "x": 640,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "example-inject-display",
+        "type": "inject",
+        "z": "example-tab",
+        "name": "Update display",
+        "props": [
+            {
+                "p": "label",
+                "v": "Temperature",
+                "vt": "str"
+            },
+            {
+                "p": "value",
+                "v": "21.5",
+                "vt": "str"
+            },
+            {
+                "p": "unit",
+                "v": "°C",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "topic": "",
+        "x": 160,
+        "y": 340,
+        "wires": [
+            [
+                "example-display"
+            ]
+        ]
+    },
+    {
+        "id": "example-display",
+        "type": "buttonplus-update-display",
+        "z": "example-tab",
+        "name": "",
+        "config": "example-config",
+        "item": 1,
+        "label": "",
+        "value": "",
+        "unit": "",
+        "svg": "",
+        "x": 420,
+        "y": 340,
+        "wires": [
+            []
+        ]
+    }
+]

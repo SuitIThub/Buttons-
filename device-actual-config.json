@@ -1,0 +1,754 @@
+{
+  "info": {
+    "id": "btn_9182a0",
+    "mac": "1C:DB:D4:91:82:A0",
+    "macid": "btn_9182a0",
+    "ipaddress": "192.168.178.33",
+    "firmware": "3.1.6-V2",
+    "ssid": "CrenGreen",
+    "ledv2": true,
+    "psram": true,
+    "connectors": [
+      {
+        "id": 0,
+        "connector": 1,
+        "type": 3
+      },
+      {
+        "id": 1,
+        "connector": 2,
+        "type": 1
+      },
+      {
+        "id": 2,
+        "connector": 3,
+        "type": 1
+      },
+      {
+        "id": 3,
+        "connector": 4,
+        "type": 1
+      }
+    ],
+    "sensors": [
+      {
+        "type": 7,
+        "description": "Liteon LTR303 Ambient Light Sensor"
+      },
+      {
+        "type": 1,
+        "description": "Sensirion STS35 Temperature Sensor"
+      },
+      {
+        "type": 8,
+        "description": "ESP32S3 Free Memory"
+      },
+      {
+        "type": 9,
+        "description": "Wifi Strength"
+      },
+      {
+        "type": 6,
+        "description": "ESP32S3 Chip Temperature"
+      }
+    ]
+  },
+  "core": {
+    "deviceid": "btn_9182a0",
+    "location": "Room 1",
+    "autobackup": true,
+    "brightness": 100,
+    "color": 16777215,
+    "wallledscolor": 0,
+    "statusbar": 2,
+    "topics": [
+      {
+        "brokerid": "buttonplus",
+        "topic": "buttonplus/btn_9182a0/page/set",
+        "payload": "",
+        "eventtype": 20
+      },
+      {
+        "brokerid": "buttonplus",
+        "topic": "buttonplus/btn_9182a0/page/status",
+        "payload": "",
+        "eventtype": 6
+      }
+    ]
+  },
+  "buttons": [
+    {
+      "buttonid": "0-1",
+      "position": 0,
+      "page": 1,
+      "label": "",
+      "toplabel": "",
+      "svg": "",
+      "longdelay": 40,
+      "longrepeat": 15,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/0/click",
+          "payload": "press",
+          "eventtype": 0
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/0/long_press",
+          "payload": "press",
+          "eventtype": 1
+        }
+      ],
+      "leds": [
+        {
+          "frontwall": "front",
+          "onrgb": 0,
+          "topics": []
+        },
+        {
+          "frontwall": "wall",
+          "onrgb": 0,
+          "topics": []
+        }
+      ]
+    },
+    {
+      "buttonid": "1-1",
+      "position": 1,
+      "page": 1,
+      "label": "",
+      "toplabel": "",
+      "svg": "",
+      "longdelay": 40,
+      "longrepeat": 15,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/1/click",
+          "payload": "press",
+          "eventtype": 0
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/1/long_press",
+          "payload": "press",
+          "eventtype": 1
+        }
+      ],
+      "leds": [
+        {
+          "frontwall": "front",
+          "onrgb": 0,
+          "topics": []
+        },
+        {
+          "frontwall": "wall",
+          "onrgb": 0,
+          "topics": []
+        }
+      ]
+    },
+    {
+      "buttonid": "2-1",
+      "position": 2,
+      "page": 1,
+      "label": "",
+      "toplabel": "",
+      "svg": "",
+      "longdelay": 40,
+      "longrepeat": 15,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/2/click",
+          "payload": "press",
+          "eventtype": 0
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/2/long_press",
+          "payload": "press",
+          "eventtype": 1
+        }
+      ],
+      "leds": [
+        {
+          "frontwall": "front",
+          "onrgb": 0,
+          "topics": []
+        },
+        {
+          "frontwall": "wall",
+          "onrgb": 0,
+          "topics": []
+        }
+      ]
+    },
+    {
+      "buttonid": "3-1",
+      "position": 3,
+      "page": 1,
+      "label": "",
+      "toplabel": "",
+      "svg": "",
+      "longdelay": 40,
+      "longrepeat": 15,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/3/click",
+          "payload": "press",
+          "eventtype": 0
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/3/long_press",
+          "payload": "press",
+          "eventtype": 1
+        }
+      ],
+      "leds": [
+        {
+          "frontwall": "front",
+          "onrgb": 0,
+          "topics": []
+        },
+        {
+          "frontwall": "wall",
+          "onrgb": 0,
+          "topics": []
+        }
+      ]
+    },
+    {
+      "buttonid": "4-1",
+      "position": 4,
+      "page": 1,
+      "label": "",
+      "toplabel": "",
+      "svg": "",
+      "longdelay": 40,
+      "longrepeat": 15,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/4/click",
+          "payload": "press",
+          "eventtype": 0
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/4/long_press",
+          "payload": "press",
+          "eventtype": 1
+        }
+      ],
+      "leds": [
+        {
+          "frontwall": "front",
+          "onrgb": 0,
+          "topics": []
+        },
+        {
+          "frontwall": "wall",
+          "onrgb": 0,
+          "topics": []
+        }
+      ]
+    },
+    {
+      "buttonid": "5-1",
+      "position": 5,
+      "page": 1,
+      "label": "",
+      "toplabel": "",
+      "svg": "",
+      "longdelay": 40,
+      "longrepeat": 15,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/5/click",
+          "payload": "press",
+          "eventtype": 0
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/5/long_press",
+          "payload": "press",
+          "eventtype": 1
+        }
+      ],
+      "leds": [
+        {
+          "frontwall": "front",
+          "onrgb": 0,
+          "topics": []
+        },
+        {
+          "frontwall": "wall",
+          "onrgb": 0,
+          "topics": []
+        }
+      ]
+    },
+    {
+      "buttonid": "6-1",
+      "position": 6,
+      "page": 1,
+      "label": "",
+      "toplabel": "",
+      "svg": "",
+      "longdelay": 40,
+      "longrepeat": 15,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/6/click",
+          "payload": "press",
+          "eventtype": 0
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/6/long_press",
+          "payload": "press",
+          "eventtype": 1
+        }
+      ],
+      "leds": [
+        {
+          "frontwall": "front",
+          "onrgb": 0,
+          "topics": []
+        },
+        {
+          "frontwall": "wall",
+          "onrgb": 0,
+          "topics": []
+        }
+      ]
+    },
+    {
+      "buttonid": "7-1",
+      "position": 7,
+      "page": 1,
+      "label": "",
+      "toplabel": "",
+      "svg": "",
+      "longdelay": 40,
+      "longrepeat": 15,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/7/click",
+          "payload": "press",
+          "eventtype": 0
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/7/long_press",
+          "payload": "press",
+          "eventtype": 1
+        }
+      ],
+      "leds": [
+        {
+          "frontwall": "front",
+          "onrgb": 0,
+          "topics": []
+        },
+        {
+          "frontwall": "wall",
+          "onrgb": 0,
+          "topics": []
+        }
+      ]
+    },
+    {
+      "buttonid": "0-2",
+      "position": 0,
+      "page": 2,
+      "label": "",
+      "toplabel": "",
+      "svg": "",
+      "longdelay": 40,
+      "longrepeat": 15,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/0/click",
+          "payload": "press",
+          "eventtype": 0
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/0/long_press",
+          "payload": "press",
+          "eventtype": 1
+        }
+      ],
+      "leds": [
+        {
+          "frontwall": "front",
+          "onrgb": 0,
+          "topics": []
+        },
+        {
+          "frontwall": "wall",
+          "onrgb": 0,
+          "topics": []
+        }
+      ]
+    },
+    {
+      "buttonid": "1-2",
+      "position": 1,
+      "page": 2,
+      "label": "",
+      "toplabel": "",
+      "svg": "",
+      "longdelay": 40,
+      "longrepeat": 15,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/1/click",
+          "payload": "press",
+          "eventtype": 0
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/1/long_press",
+          "payload": "press",
+          "eventtype": 1
+        }
+      ],
+      "leds": [
+        {
+          "frontwall": "front",
+          "onrgb": 0,
+          "topics": []
+        },
+        {
+          "frontwall": "wall",
+          "onrgb": 0,
+          "topics": []
+        }
+      ]
+    },
+    {
+      "buttonid": "2-2",
+      "position": 2,
+      "page": 2,
+      "label": "",
+      "toplabel": "",
+      "svg": "",
+      "longdelay": 40,
+      "longrepeat": 15,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/2/click",
+          "payload": "press",
+          "eventtype": 0
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/2/long_press",
+          "payload": "press",
+          "eventtype": 1
+        }
+      ],
+      "leds": [
+        {
+          "frontwall": "front",
+          "onrgb": 0,
+          "topics": []
+        },
+        {
+          "frontwall": "wall",
+          "onrgb": 0,
+          "topics": []
+        }
+      ]
+    },
+    {
+      "buttonid": "3-2",
+      "position": 3,
+      "page": 2,
+      "label": "",
+      "toplabel": "",
+      "svg": "",
+      "longdelay": 40,
+      "longrepeat": 15,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/3/click",
+          "payload": "press",
+          "eventtype": 0
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/3/long_press",
+          "payload": "press",
+          "eventtype": 1
+        }
+      ],
+      "leds": [
+        {
+          "frontwall": "front",
+          "onrgb": 0,
+          "topics": []
+        },
+        {
+          "frontwall": "wall",
+          "onrgb": 0,
+          "topics": []
+        }
+      ]
+    },
+    {
+      "buttonid": "4-2",
+      "position": 4,
+      "page": 2,
+      "label": "",
+      "toplabel": "",
+      "svg": "",
+      "longdelay": 40,
+      "longrepeat": 15,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/4/click",
+          "payload": "press",
+          "eventtype": 0
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/4/long_press",
+          "payload": "press",
+          "eventtype": 1
+        }
+      ],
+      "leds": [
+        {
+          "frontwall": "front",
+          "onrgb": 0,
+          "topics": []
+        },
+        {
+          "frontwall": "wall",
+          "onrgb": 0,
+          "topics": []
+        }
+      ]
+    },
+    {
+      "buttonid": "5-2",
+      "position": 5,
+      "page": 2,
+      "label": "",
+      "toplabel": "",
+      "svg": "",
+      "longdelay": 40,
+      "longrepeat": 15,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/5/click",
+          "payload": "press",
+          "eventtype": 0
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/5/long_press",
+          "payload": "press",
+          "eventtype": 1
+        }
+      ],
+      "leds": [
+        {
+          "frontwall": "front",
+          "onrgb": 0,
+          "topics": []
+        },
+        {
+          "frontwall": "wall",
+          "onrgb": 0,
+          "topics": []
+        }
+      ]
+    },
+    {
+      "buttonid": "6-2",
+      "position": 6,
+      "page": 2,
+      "label": "",
+      "toplabel": "",
+      "svg": "",
+      "longdelay": 40,
+      "longrepeat": 15,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/6/click",
+          "payload": "press",
+          "eventtype": 0
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/6/long_press",
+          "payload": "press",
+          "eventtype": 1
+        }
+      ],
+      "leds": [
+        {
+          "frontwall": "front",
+          "onrgb": 0,
+          "topics": []
+        },
+        {
+          "frontwall": "wall",
+          "onrgb": 0,
+          "topics": []
+        }
+      ]
+    },
+    {
+      "buttonid": "7-2",
+      "position": 7,
+      "page": 2,
+      "label": "",
+      "toplabel": "",
+      "svg": "",
+      "longdelay": 40,
+      "longrepeat": 15,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/7/click",
+          "payload": "press",
+          "eventtype": 0
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/button/7/long_press",
+          "payload": "press",
+          "eventtype": 1
+        }
+      ],
+      "leds": [
+        {
+          "frontwall": "front",
+          "onrgb": 0,
+          "topics": []
+        },
+        {
+          "frontwall": "wall",
+          "onrgb": 0,
+          "topics": []
+        }
+      ]
+    }
+  ],
+  "displayitems": [
+    {
+      "displayitemid": "0",
+      "x": 12,
+      "y": 15,
+      "boxtype": 0,
+      "fontsize": 3,
+      "align": 0,
+      "width": 80,
+      "round": 0,
+      "label": "",
+      "unit": "",
+      "page": 1,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/displayitem/0/label/set",
+          "payload": "",
+          "eventtype": 11
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/displayitem/0/value/set",
+          "payload": "",
+          "eventtype": 15
+        }
+      ]
+    },
+    {
+      "displayitemid": "1",
+      "x": 2,
+      "y": 56,
+      "boxtype": 0,
+      "fontsize": 3,
+      "align": 0,
+      "width": 80,
+      "round": 0,
+      "label": "",
+      "unit": "",
+      "page": 1,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/displayitem/1/label/set",
+          "payload": "",
+          "eventtype": 11
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/displayitem/1/value/set",
+          "payload": "",
+          "eventtype": 15
+        }
+      ]
+    },
+    {
+      "displayitemid": "2",
+      "x": 10,
+      "y": 12,
+      "boxtype": 0,
+      "fontsize": 3,
+      "align": 0,
+      "width": 80,
+      "round": 0,
+      "label": "",
+      "unit": "",
+      "page": 2,
+      "topics": [
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/displayitem/2/label/set",
+          "payload": "",
+          "eventtype": 11
+        },
+        {
+          "brokerid": "buttonplus",
+          "topic": "buttonplus/btn_9182a0/displayitem/2/value/set",
+          "payload": "",
+          "eventtype": 15
+        }
+      ]
+    }
+  ],
+  "brokers": [
+    {
+      "brokerid": "buttonplus",
+      "url": "mqtt://crenserver",
+      "port": 1883,
+      "wsport": 0,
+      "username": "GIS",
+      "password": "GIS2017!",
+      "defaultschema": true,
+      "defaultschemalocalstate": true,
+      "hassdiscovery": false
+    }
+  ],
+  "sensors": []
+}

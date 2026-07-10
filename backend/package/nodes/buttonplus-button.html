@@ -1,0 +1,155 @@
+<script type="text/javascript" src="resources/@nielseulink/node-red-contrib-buttonplus/buttonplus-editor.js"></script>
+<script type="text/javascript">
+    function bpToggleLedFields(ledSelector, fieldSelectors) {
+        const ledInput = $(ledSelector);
+        const rows = fieldSelectors.map(function (sel) {
+            return $(sel).closest('.form-row');
+        });
+
+        function update() {
+            const show = ledInput.val() !== 'none';
+            rows.forEach(function (row) {
+                row.toggle(show);
+            });
+        }
+
+        ledInput.on('change', update);
+        update();
+    }
+
+    RED.nodes.registerType('buttonplus-button', {
+        category: 'buttonplus',
+        color: '#DDAA99',
+        defaults: {
+            name: { value: '' },
+            config: { value: '', type: 'buttonplus-config', required: true },
+            page: { value: 1, validate: RED.validators.number() },
+            button: { value: 1, validate: RED.validators.number() },
+            led: { value: 'none' },
+            ledColor: { value: '#a10303' },
+            ledDuration: { value: '0.5' },
+            outputProperties: { value: [] }
+        },
+        inputs: 1,
+        outputs: 2,
+        outputLabels: ['short press', 'long press'],
+        icon: 'font-awesome/fa-hand-pointer-o',
+        label: function () {
+            return this.name || `Button+ click ${this.button}-${this.page}`;
+        },
+        paletteLabel: 'Button+ click',
+        oneditprepare: function () {
+            bpToggleLedFields('#node-input-led', [
+                '#node-input-ledColor',
+                '#node-input-ledDuration'
+            ]);
+            bpPrepareOutputProperties(this, {
+                sources: BP_CLICK_EVENT_SOURCES,
+                defaults: []
+            });
+        },
+        oneditsave: function () {
+            bpSaveOutputProperties(this);
+        },
+        oneditresize: bpResizeOutputProperties
+    });
+</script>
+
+<script type="text/html" data-template-name="buttonplus-button">
+    <div class="form-row">
+        <label for="node-input-name">Name</label>
+        <input type="text" id="node-input-name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-config">Config</label>
+        <input type="text" id="node-input-config">
+    </div>
+    <div class="form-row">
+        <label for="node-input-page">Page</label>
+        <input type="number" id="node-input-page" min="1">
+    </div>
+    <div class="form-row">
+        <label for="node-input-button">Button</label>
+        <input type="number" id="node-input-button" min="1">
+    </div>
+    <div class="form-row">
+        <label for="node-input-led">LED</label>
+        <select id="node-input-led">
+            <option value="none">none</option>
+            <option value="front">front</option>
+            <option value="wall">wall</option>
+            <option value="both">front + wall</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-input-ledColor">LED color</label>
+        <input type="text" id="node-input-ledColor">
+    </div>
+    <div class="form-row">
+        <label for="node-input-ledDuration">LED duration</label>
+        <select id="node-input-ledDuration">
+            <option value="none">Steady</option>
+            <option value="0.5">0.5 sec</option>
+            <option value="1">1 sec</option>
+        </select>
+    </div>
+    <div class="form-row node-input-output-properties-container-row">
+        <label>Output properties</label>
+        <ol id="node-input-output-properties-container"></ol>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="buttonplus-button">
+    <p>Listens for Button+ short and long press events on MQTT.</p>
+    <p>On deploy, the node subscribes to the configured button. Send a message to the input to change the subscription or LED settings at runtime.</p>
+    <p>Optionally activates the button LED after each recognized press.</p>
+    <h3>Override precedence</h3>
+    <p><code>msg</code> property &gt; node configuration. Device id comes from the linked Button+ config node.</p>
+    <h3>Input message properties</h3>
+    <dl class="message-properties">
+        <dt>page <span class="property-type">number</span></dt>
+        <dd>Button page number.</dd>
+        <dt>button <span class="property-type">number</span></dt>
+        <dd>Button number on the page.</dd>
+        <dt>led <span class="property-type">string</span></dt>
+        <dd><code>none</code> skips the LED. <code>front</code>, <code>wall</code> or <code>both</code> lights up after a press.</dd>
+        <dt>led_color <span class="property-type">string</span></dt>
+        <dd>LED color, for example <code>#a10303</code>.</dd>
+        <dt>led_delay <span class="property-type">string | number</span></dt>
+        <dd>LED timing. Use <code>steady</code> or <code>none</code> to keep the LED on after the press. Use <code>0.5</code>, <code>1</code> or any positive number of seconds for a pulse.</dd>
+    </dl>
+    <h3>Outputs</h3>
+    <dl class="message-properties">
+        <dt class="output">Output 1 <span class="property-type">short press</span></dt>
+        <dd>Emitted when the event type equals <code>shortpress</code>.</dd>
+        <dt class="output">Output 2 <span class="property-type">long press</span></dt>
+        <dd>Emitted when the event type equals <code>longpress</code>.</dd>
+    </dl>
+    <h3>Output properties</h3>
+    <p>Add output mappings to build the outgoing <code>msg</code> object. With an empty list the node sends an empty message.</p>
+    <p>Available sources:</p>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">object</span></dt>
+        <dd>Original MQTT payload from the Button+.</dd>
+        <dt>topic <span class="property-type">string</span></dt>
+        <dd>MQTT topic the event was received on.</dd>
+        <dt>device <span class="property-type">string</span></dt>
+        <dd>Button+ device id from the config node.</dd>
+        <dt>button_page <span class="property-type">number</span></dt>
+        <dd>Page of the pressed button (not the device active page).</dd>
+        <dt>button <span class="property-type">number</span></dt>
+        <dd>Button number on the page.</dd>
+        <dt>event_type <span class="property-type">string</span></dt>
+        <dd><code>shortpress</code> or <code>longpress</code>.</dd>
+        <dt>buttonplus <span class="property-type">object</span></dt>
+        <dd>All metadata fields grouped in one object.</dd>
+        <dt>buttonplus_debug <span class="property-type">object</span></dt>
+        <dd>Debug info with the received MQTT message in <code>input</code> and any LED MQTT messages sent after the press in <code>mqtt</code>.</dd>
+    </dl>
+    <p>Tip: map <code>payload</code> and <code>buttonplus</code> to get the previous default output. The <code>buttonplus</code> object does not set <code>msg.page</code>, so you can wire the click node into other Button+ nodes without overriding their page setting.</p>
+    <h3>MQTT topic</h3>
+    <p>Subscribes to:</p>
+    <ul>
+        <li><code>{prefix}/{device}/button/{button}-{page}/pushbutton</code></li>
+    </ul>
+</script>
