@@ -619,6 +619,15 @@ export function CommandEditor({ commands, variables, groups, scene, selfGroupId,
                   set={(patch) => set(c.id, patch)}
                 />
               )}
+              {/* „Sonst wenn" ist ein Marker (kein CommandFields), braucht aber eine Bedingung. */}
+              {c.type === "elseif" && (
+                <Input
+                  className="min-w-0 flex-1"
+                  placeholder="Bedingung, z. B. count > 3"
+                  value={c.condition ?? ""}
+                  onChange={(e) => set(c.id, { condition: e.target.value })}
+                />
+              )}
               {c.type === "if" && (
                 <div className="flex gap-1">
                   <button onClick={() => insertBranch(idx, "elseif")} className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-slate-300 hover:bg-white/10">+ Sonst-wenn</button>
