@@ -1,9 +1,15 @@
 /**
  * Flacht geschachtelte JSON-Strukturen zu einem einstufigen Dict ab.
- * Geschachtelte Keys werden mit "/" verbunden, Array-Indizes zählen als Keys:
+ * Geschachtelte Keys werden mit "/" verbunden, Array-Indizes zählen als Keys.
+ * Für Listen werden zusätzlich die Länge (".../length") und die Liste selbst
+ * (".../list") als Keys eingefügt:
  *
- *   { "key1": "val1", "key2": { "key3": "val2" }, "list": [7, 8] }
- *   → { "key1": "val1", "key2/key3": "val2", "list/0": 7, "list/1": 8 }
+ *   { "key1": "val1", "key2": { "key3": "val2" }, "items": ["val1", "val2"] }
+ *   → {
+ *       "key1": "val1", "key2/key3": "val2",
+ *       "items/0": "val1", "items/1": "val2",
+ *       "items/length": 2, "items/list": ["val1", "val2"],
+ *     }
  *
  * Primitive an der Wurzel landen unter dem Key "value". null → "".
  */
@@ -20,13 +26,20 @@ export function flattenJson(
     return out;
   }
 
-  if (typeof value === "object") {
-    const entries = Array.isArray(value)
-      ? value.map((v, i) => [String(i), v] as const)
-      : Object.entries(value as Record<string, unknown>);
+  if (Array.isArray(value)) {
+    // Index-Keys wie bisher …
+    value.forEach((v, i) => {
+      flattenJson(v, prefix ? `${prefix}/${i}` : String(i), out);
+    });
+    // … plus Länge und die unveränderte Liste selbst.
+    out[prefix ? `${prefix}/length` : "length"] = value.length;
+    out[prefix ? `${prefix}/list` : "list"] = value as VarValue;
+    return out;
+  }
 
-    // Leere Objekte/Arrays hinterlassen keinen Key.
-    for (const [k, v] of entries) {
+  if (typeof value === "object") {
+    // Leere Objekte hinterlassen keinen Key.
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
       flattenJson(v, prefix ? `${prefix}/${k}` : k, out);
     }
     return out;

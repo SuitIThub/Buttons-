@@ -49,11 +49,25 @@ const variables: VariableDef[] = [
   { name: "wetter", type: "dict", initial: { temp: 5, "main/humidity": 80 } },
   { name: "out", type: "string", initial: "" },
   { name: "out2", type: "string", initial: "" },
+  // Quelle mit gemischten Werttypen + Ziele je Typ (für Typ-Kompatibilität).
+  { name: "mixed", type: "dict", initial: { lst: ["a", "b"], obj: { k: 1 }, num: 7, str: "hi" } },
+  { name: "tLst", type: "list", initial: [] },
+  { name: "tStr", type: "string", initial: "" },
+  { name: "tInt", type: "int", initial: 0 },
+  { name: "tNum", type: "int", initial: 0 },
+  { name: "tDict", type: "dict", initial: {} },
 ];
 
 // dictGet-Befehle mit festen Referenzen (für Ergebnis-Checks).
 const dgOk = cmd({ type: "dictGet", target: "out", from: "wetter", key: "temp" });
 const dgMiss = cmd({ type: "dictGet", target: "out2", from: "wetter", key: "temperatur" });
+// Typ-Kombinationen: Liste→Liste (nativ), Liste→String (String-Form), Liste→Int (blockiert),
+// Dict→Dict (nativ), Zahl→Int (nativ).
+const dgListNative = cmd({ type: "dictGet", target: "tLst", from: "mixed", key: "lst" });
+const dgListStr = cmd({ type: "dictGet", target: "tStr", from: "mixed", key: "lst" });
+const dgListBlock = cmd({ type: "dictGet", target: "tInt", from: "mixed", key: "lst" });
+const dgDictNative = cmd({ type: "dictGet", target: "tDict", from: "mixed", key: "obj" });
+const dgNumNative = cmd({ type: "dictGet", target: "tNum", from: "mixed", key: "num" });
 
 const scenes: Scene[] = [
   {
@@ -112,6 +126,7 @@ const scenes: Scene[] = [
         cmd({ type: "httpRequest", method: "GET", url: "http://test.local/api?c={c}", variable: "data" }),
       ] },
       { id: "g-dict", name: "dict", commands: [dgOk, dgMiss] },
+      { id: "g-dicttypes", name: "dicttypes", commands: [dgListNative, dgListStr, dgListBlock, dgDictNative, dgNumNative] },
     ],
     createdAt: 0, updatedAt: 0,
   },
@@ -210,6 +225,20 @@ async function main() {
     check("dictGet (Treffer) Ergebnis-Status ok", cr[dgOk.id]?.status, "ok");
     check("dictGet (fehlender Schlüssel) → warn", cr[dgMiss.id]?.status, "warn");
     check("Warnung nennt vorhandene Schlüssel", /temp/.test(cr[dgMiss.id]?.message ?? ""), true);
+  }
+
+  console.log("\n=== dictGet: Typ-Kompatibilität der Ziele ===");
+  runtime.runGroupById("s1", "g-dicttypes"); await flush();
+  {
+    const cr = runtime.getState().commandResults;
+    check("Liste → Listen-Variable (nativ)", vars.get("tLst"), ["a", "b"]);
+    check("Liste → Listen-Variable Status ok", cr[dgListNative.id]?.status, "ok");
+    check("Liste → String-Variable (String-Form)", vars.get("tStr"), '["a","b"]');
+    check("Liste → String-Variable Status ok", cr[dgListStr.id]?.status, "ok");
+    check("Liste → Int-Variable blockiert (Wert unverändert 0)", vars.get("tInt"), 0);
+    check("Liste → Int-Variable Status warn", cr[dgListBlock.id]?.status, "warn");
+    check("Dict → Dict-Variable (nativ)", vars.get("tDict"), { k: 1 });
+    check("Zahl → Int-Variable (nativ)", vars.get("tNum"), 7);
   }
 
   console.log("\n=== VariableState: resync erhält Werte, computed, enum ===");

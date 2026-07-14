@@ -132,7 +132,8 @@ const { flattenJson } = await import("./src/engine/flatten.js");
 check("Beispiel aus Anforderung", flattenJson({ key1: "val1", key2: { key3: "val2" } }),
   { key1: "val1", "key2/key3": "val2" });
 check("tiefe Schachtelung", flattenJson({ a: { b: { c: 1 } } }), { "a/b/c": 1 });
-check("Arrays als Index-Keys", flattenJson({ list: [7, 8] }), { "list/0": 7, "list/1": 8 });
+check("Arrays: Index-Keys plus length und list", flattenJson({ list: [7, 8] }),
+  { "list/0": 7, "list/1": 8, "list/length": 2, "list/list": [7, 8] });
 check("null → leerer String", flattenJson({ a: null }), { a: "" });
 check("primitive Wurzel → 'value'", flattenJson(42), { value: 42 });
 check("gemischte Typen bleiben erhalten", flattenJson({ n: 1.5, b: true, s: "x" }), { n: 1.5, b: true, s: "x" });

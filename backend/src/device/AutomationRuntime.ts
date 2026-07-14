@@ -28,6 +28,7 @@ import {
   NavSettings,
   Page,
   VarValue,
+  VarType,
   VariableDef,
   DEFAULT_NAV,
   cookbookApiName,
@@ -781,13 +782,22 @@ export class AutomationRuntime extends EventEmitter {
         const key = this.resolveKey(c.key);
         const obj = dict as Record<string, VarValue>;
         const has = Object.prototype.hasOwnProperty.call(obj, key);
-        this.vars.set(c.target, has ? obj[key] : "");
-        if (has) {
-          ok(`${c.target} = ${this.short(obj[key])}`);
-        } else {
+        if (!has) {
+          this.vars.set(c.target, "");
           const keys = Object.keys(obj);
           warn(`Schlüssel „${key}" fehlt. Vorhanden: ${keys.length ? this.short(keys) : "(keine)"}`);
+          return "normal";
         }
+        const value = obj[key];
+        const targetType = this.vars.getType(c.target);
+        if (targetType === undefined) { warn(`Ziel „${c.target}" ist nicht definiert`); return "normal"; }
+        if (!this.canAssignTo(value, targetType)) {
+          warn(`Wert vom Typ „${this.natTypeOf(value)}" passt nicht in „${c.target}" (Typ „${targetType}"). Erlaubt: passende Variable oder String.`);
+          return "normal";
+        }
+        // Kompatibel: nativer Typ 1:1, sonst als String-Form (set() coerct passend).
+        this.vars.set(c.target, value);
+        ok(`${c.target} = ${this.short(value)}`);
         return "normal";
       }
 
@@ -1285,6 +1295,31 @@ export class AutomationRuntime extends EventEmitter {
    */
   private resolveKey(key: string | undefined): string {
     return interpolate(key ?? "", this.vars.scope());
+  }
+
+  /** Natürlicher Typ eines Laufzeitwerts (für Typ-Kompatibilitätsprüfungen). */
+  private natTypeOf(v: VarValue): "list" | "dict" | "bool" | "number" | "string" {
+    if (Array.isArray(v)) return "list";
+    if (v !== null && typeof v === "object") return "dict";
+    if (typeof v === "boolean") return "bool";
+    if (typeof v === "number") return "number";
+    return "string";
+  }
+
+  /**
+   * Prüft, ob ein Wert in eine Variable des Zieltyps geladen werden darf:
+   * entweder in eine typgleiche Variable (native Übernahme) oder als String-Form
+   * in eine String-/Enum-Variable. Jede andere Kombination wird blockiert.
+   */
+  private canAssignTo(value: VarValue, targetType: VarType): boolean {
+    if (targetType === "string" || targetType === "enum") return true;
+    switch (this.natTypeOf(value)) {
+      case "list": return targetType === "list";
+      case "dict": return targetType === "dict";
+      case "bool": return targetType === "bool";
+      case "number": return targetType === "int" || targetType === "float";
+      case "string": return false; // reiner String nur in String/Enum (oben)
+    }
   }
 
   // ==================== COOKBOOK ====================
