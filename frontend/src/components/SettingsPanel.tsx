@@ -1,11 +1,23 @@
 import { useEffect, useRef, useState } from "react";
-import { NavSettings, Page, Settings, StatusResponse } from "../lib/types";
+import { LedDimSettings, NavSettings, Page, RuntimeState, Settings, StatusResponse } from "../lib/types";
 import { api } from "../lib/api";
 import { Button, Card, Field, Input, Select } from "./ui";
 import { connectorLabel } from "../lib/helpers";
 
+const DEFAULT_LED_DIM: LedDimSettings = {
+  enabled: false,
+  brightnessPercent: 20,
+  windows: [{ start: "22:00", end: "06:00" }],
+};
+
+function toTimeValue(value: string | undefined): string {
+  const v = (value ?? "").slice(0, 5);
+  return /^\d{2}:\d{2}$/.test(v) ? v : "22:00";
+}
+
 export function SettingsPanel({
   status,
+  runtime,
   pages,
   onSaved,
   onImported,
@@ -14,6 +26,7 @@ export function SettingsPanel({
   onError,
 }: {
   status: StatusResponse | null;
+  runtime: RuntimeState | null;
   pages: Page[];
   onSaved: () => void;
   onImported: () => void;
@@ -57,12 +70,29 @@ export function SettingsPanel({
     deviceId: "",
   });
   const [nav, setNav] = useState<NavSettings>({ wrap: false, ledOnHex: "#00ff00", ledOffHex: "#ff0000", homePageId: "", homeTimeoutSeconds: 300 });
+  const [ledDim, setLedDim] = useState<LedDimSettings>(DEFAULT_LED_DIM);
   const [saving, setSaving] = useState(false);
+  const ledDimTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ledDimRef = useRef(ledDim);
+  ledDimRef.current = ledDim;
 
   useEffect(() => {
     if (status?.settings) setForm({ ...status.settings, mqttPassword: "" });
     if (status?.nav) setNav(status.nav);
+    if (status?.ledDim) {
+      const next = {
+        ...DEFAULT_LED_DIM,
+        ...status.ledDim,
+        windows: Array.isArray(status.ledDim.windows) ? status.ledDim.windows : DEFAULT_LED_DIM.windows,
+      };
+      ledDimRef.current = next;
+      setLedDim(next);
+    }
   }, [status]);
+
+  useEffect(() => () => {
+    if (ledDimTimer.current) clearTimeout(ledDimTimer.current);
+  }, []);
 
   const set = (patch: Partial<Settings>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -86,6 +116,45 @@ export function SettingsPanel({
     } catch (e) {
       onError((e as Error).message);
     }
+  };
+
+  const persistLedDim = async (next: LedDimSettings) => {
+    try {
+      const saved = await api.updateLedDim(next);
+      ledDimRef.current = saved;
+      setLedDim(saved);
+    } catch (e) {
+      onError((e as Error).message);
+    }
+  };
+
+  const saveLedDim = (patch: Partial<LedDimSettings>, debounce = false) => {
+    const next: LedDimSettings = { ...ledDimRef.current, ...patch };
+    ledDimRef.current = next;
+    setLedDim(next);
+    if (ledDimTimer.current) clearTimeout(ledDimTimer.current);
+    const flush = () => {
+      ledDimTimer.current = null;
+      void persistLedDim(ledDimRef.current);
+    };
+    if (!debounce) {
+      flush();
+      return;
+    }
+    ledDimTimer.current = setTimeout(flush, 400);
+  };
+
+  const updateWindow = (index: number, patch: Partial<LedDimSettings["windows"][number]>) => {
+    const windows = ledDimRef.current.windows.map((w, i) => (i === index ? { ...w, ...patch } : w));
+    saveLedDim({ windows });
+  };
+
+  const removeWindow = (index: number) => {
+    saveLedDim({ windows: ledDimRef.current.windows.filter((_, i) => i !== index) });
+  };
+
+  const addWindow = () => {
+    saveLedDim({ windows: [...ledDimRef.current.windows, { start: "22:00", end: "06:00" }] });
   };
 
   return (
@@ -243,6 +312,72 @@ export function SettingsPanel({
                 (0 = aus). Nach einem Deploy startet immer die erste Seite.
               </p>
             </div>
+          </div>
+        </Card>
+
+        <Card title="LED-Helligkeit">
+          <div className="flex flex-col gap-3">
+            <label className="flex items-center gap-2 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                checked={ledDim.enabled}
+                onChange={(e) => saveLedDim({ enabled: e.target.checked })}
+              />
+              Button-LEDs in Zeitspannen reduzieren
+            </label>
+            {runtime?.ledDimActive && (
+              <p className="text-xs text-amber-300">Aktuell aktiv — alle Button-LEDs sind reduziert.</p>
+            )}
+            <Field label={`Helligkeit in den Zeitspannen (${ledDim.brightnessPercent} %)`}>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={ledDim.brightnessPercent}
+                disabled={!ledDim.enabled}
+                onChange={(e) => saveLedDim({ brightnessPercent: Number(e.target.value) }, true)}
+                className="w-full accent-brand disabled:opacity-40"
+              />
+            </Field>
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-medium text-slate-400">Zeitspannen (Ortszeit)</p>
+              {ledDim.windows.map((w, i) => (
+                <div key={i} className="flex items-end gap-2">
+                  <Field label="Von">
+                    <Input
+                      type="time"
+                      value={toTimeValue(w.start)}
+                      disabled={!ledDim.enabled}
+                      onChange={(e) => updateWindow(i, { start: e.target.value.slice(0, 5) })}
+                    />
+                  </Field>
+                  <Field label="Bis">
+                    <Input
+                      type="time"
+                      value={toTimeValue(w.end)}
+                      disabled={!ledDim.enabled}
+                      onChange={(e) => updateWindow(i, { end: e.target.value.slice(0, 5) })}
+                    />
+                  </Field>
+                  <Button
+                    variant="ghost"
+                    className="mb-0.5 shrink-0"
+                    disabled={!ledDim.enabled}
+                    onClick={() => removeWindow(i)}
+                  >
+                    Entfernen
+                  </Button>
+                </div>
+              ))}
+              <Button variant="ghost" disabled={!ledDim.enabled} onClick={addWindow}>
+                Zeitspanne hinzufügen
+              </Button>
+            </div>
+            <p className="text-xs text-slate-500">
+              Gilt für alle Button-LEDs (Front, Wand, Navigation). Zeitspannen über Mitternacht
+              sind möglich, z. B. 22:00–06:00. Die Display-Helligkeit bleibt unverändert.
+            </p>
           </div>
         </Card>
       </div>

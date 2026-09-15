@@ -275,7 +275,7 @@ export class DeviceManager {
     //    der Rücksprung zur Hauptseite übernimmt der Idle-Timer.
     console.log("[Deploy] Activating runtime...");
     this.syncVars();
-    this.runtime.activate(output, this.store.getScenes(), this.store.getNav(), this.store.getPages());
+    this.runtime.activate(output, this.store.getScenes(), this.store.getNav(), this.store.getPages(), this.store.getLedDim());
 
     // 6. Device synchronisieren und rendern
     console.log("[Deploy] Syncing device page...");
@@ -309,7 +309,7 @@ export class DeviceManager {
     try {
       const output = this.compile();
       this.syncVars();
-      this.runtime.activate(output, this.store.getScenes(), this.store.getNav(), this.store.getPages());
+      this.runtime.activate(output, this.store.getScenes(), this.store.getNav(), this.store.getPages(), this.store.getLedDim());
       console.log("[Runtime] Started successfully");
       return true;
     } catch (err) {
@@ -336,6 +336,13 @@ export class DeviceManager {
   async renameVariable(oldName: string, newName: string): Promise<void> {
     await this.store.renameVariable(oldName, newName);
     this.startRuntime();
+  }
+
+  /**
+   * Übernimmt gespeicherte LED-Dimm-Einstellungen in die laufende Runtime.
+   */
+  applyLedDim(): void {
+    this.runtime.setLedDim(this.store.getLedDim());
   }
 
   /**

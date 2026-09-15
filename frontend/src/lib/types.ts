@@ -36,6 +36,18 @@ export interface NavSettings {
   homeTimeoutSeconds?: number;
 }
 
+export interface LedDimWindow {
+  start: string;
+  end: string;
+}
+
+export interface LedDimSettings {
+  enabled: boolean;
+  /** Prozent der vollen LED-Helligkeit während aktiver Zeitspannen (0–100). */
+  brightnessPercent: number;
+  windows: LedDimWindow[];
+}
+
 export type VarType = "string" | "int" | "float" | "bool" | "list" | "dict" | "enum";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type VarValue = any;
@@ -292,12 +304,14 @@ export interface RuntimeState {
   variables: Record<string, VarValue>;
   system: Record<string, VarValue>;
   commandResults?: Record<string, CommandResult>;
+  ledDimActive?: boolean;
 }
 
 export interface StatusResponse {
   mqtt: MqttStatus;
   settings: Settings;
   nav: NavSettings;
+  ledDim?: LedDimSettings;
   device: DeviceInfo;
   runtime: RuntimeState;
   /** Es gibt gespeicherte, aber noch nicht deployte Modelländerungen. */

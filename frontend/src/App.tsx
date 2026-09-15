@@ -244,6 +244,7 @@ export default function App() {
           {tab === "settings" && (
             <SettingsPanel
               status={status}
+              runtime={runtime}
               pages={pages}
               onSaved={async () => {
                 await refreshStatus();

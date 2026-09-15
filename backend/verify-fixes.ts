@@ -8,6 +8,13 @@ import { DeviceService } from "./src/device/DeviceService.js";
 import { DeviceConfigBuilder } from "./src/device/DeviceConfigBuilder.js";
 import type { BPConfig } from "./src/buttonplus/types.js";
 import type { Page, Scene } from "./src/model.js";
+import {
+  isInLedDimWindow,
+  isLedDimActive,
+  ledBrightnessScale,
+  msUntilNextLedDimChange,
+  normalizeLedDim,
+} from "./src/ledDim.js";
 
 let pass = 0;
 let fail = 0;
@@ -37,6 +44,18 @@ svc.setButtonColor(2, 0, "#FF0000");
 check("rgb topic+decimal", mqtt.pubs[0], { topic: "buttonplus/btn_9182a0/button/3-1/led/front/rgb/set", payload: "16711680", retain: true });
 check("brightness 255", mqtt.pubs[1], { topic: "buttonplus/btn_9182a0/button/3-1/led/front/brightness/set", payload: "255", retain: true });
 check("on = 'true'", mqtt.pubs[2], { topic: "buttonplus/btn_9182a0/button/3-1/led/front/on/set", payload: "true", retain: true });
+
+console.log("\n=== DeviceService: LED brightness scale (Nachtmodus) ===");
+mqtt.reset();
+svc.resetPublishCache();
+svc.setLedBrightnessScale(0.2);
+svc.setButtonColor(2, 0, "#FF0000");
+check("brightness 20% → 51", mqtt.pubs[1], { topic: "buttonplus/btn_9182a0/button/3-1/led/front/brightness/set", payload: "51", retain: true });
+svc.setLedBrightnessScale(1);
+svc.resetPublishCache();
+mqtt.reset();
+svc.setButtonColor(2, 0, "#FF0000");
+check("scale 1 → brightness 255", mqtt.pubs[1], { topic: "buttonplus/btn_9182a0/button/3-1/led/front/brightness/set", payload: "255", retain: true });
 
 console.log("\n=== DeviceService: LED off (both sides) ===");
 mqtt.reset();
@@ -164,6 +183,36 @@ console.log("\n=== DeviceService: Publish-Deduplizierung ===");
   d.setPage(0);
   d.setPage(0);
   check("nicht-retained page/set wird NICHT dedupliziert", m.pubs.length, 2);
+}
+
+console.log("\n=== LED-Dimmung: Zeitfenster ===");
+{
+  const dim = normalizeLedDim({
+    enabled: true,
+    brightnessPercent: 20,
+    windows: [{ start: "22:00", end: "06:00" }, { start: "12:00", end: "13:00" }],
+  });
+  check("Overnight 23:00 aktiv", isInLedDimWindow(23 * 60, "22:00", "06:00"), true);
+  check("Overnight 05:59 aktiv", isInLedDimWindow(5 * 60 + 59, "22:00", "06:00"), true);
+  check("Overnight 06:00 inaktiv", isInLedDimWindow(6 * 60, "22:00", "06:00"), false);
+  check("Overnight 12:00 inaktiv", isInLedDimWindow(12 * 60, "22:00", "06:00"), false);
+  check("Mittag 12:30 aktiv", isInLedDimWindow(12 * 60 + 30, "12:00", "13:00"), true);
+  check("identische Zeiten inaktiv", isInLedDimWindow(12 * 60, "12:00", "12:00"), false);
+
+  const noon = new Date(2026, 0, 1, 12, 30, 0);
+  const evening = new Date(2026, 0, 1, 23, 0, 0);
+  const morning = new Date(2026, 0, 1, 8, 0, 0);
+  check("aktiv mittags (zweites Fenster)", isLedDimActive(dim, noon), true);
+  check("aktiv nachts", isLedDimActive(dim, evening), true);
+  check("inaktiv vormittags", isLedDimActive(dim, morning), false);
+  check("Skala nachts 0.2", ledBrightnessScale(dim, evening), 0.2);
+  check("Skala tags 1", ledBrightnessScale(dim, morning), 1);
+
+  const disabled = normalizeLedDim({ ...dim, enabled: false });
+  check("deaktiviert → Skala 1", ledBrightnessScale(disabled, evening), 1);
+
+  const until = msUntilNextLedDimChange(dim, new Date(2026, 0, 1, 21, 59, 30));
+  check("nächster Wechsel in 30s", until, 30_000);
 }
 
 console.log(`\n=== Result: ${pass} passed, ${fail} failed ===`);

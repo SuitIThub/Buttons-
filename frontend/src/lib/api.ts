@@ -1,4 +1,5 @@
 import {
+  LedDimSettings,
   NavSettings,
   Page,
   RuntimeState,
@@ -31,6 +32,10 @@ export const api = {
   getNav: () => req<NavSettings>("/api/nav"),
   updateNav: (patch: Partial<NavSettings>) =>
     req<NavSettings>("/api/nav", { method: "PUT", body: JSON.stringify(patch) }),
+
+  getLedDim: () => req<LedDimSettings>("/api/led-dim"),
+  updateLedDim: (patch: Partial<LedDimSettings>) =>
+    req<LedDimSettings>("/api/led-dim", { method: "PUT", body: JSON.stringify(patch) }),
 
   pullConfig: () => req<{ config: unknown }>("/api/config/pull", { method: "POST" }),
   getSensors: () => req<SensorInfo[]>("/api/sensors"),

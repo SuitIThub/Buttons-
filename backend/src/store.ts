@@ -2,7 +2,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { AppSettings } from "./buttonplus/types.js";
-import { DisplayElement, NavSettings, Page, Scene, VariableDef, VarValue, DEFAULT_NAV, normalizeSceneDisplay, collectVariableRefsFromScene, defaultVarValue, generateCookBookDisplay } from "./model.js";
+import { DisplayElement, NavSettings, LedDimSettings, Page, Scene, VariableDef, VarValue, DEFAULT_NAV, DEFAULT_LED_DIM, normalizeSceneDisplay, collectVariableRefsFromScene, defaultVarValue, generateCookBookDisplay } from "./model.js";
+import { normalizeLedDim } from "./ledDim.js";
 import { loadEnvSettings, mergeSettings, settingsHealedFromEnv, DATA_DIR } from "./config.js";
 
 // v3: Trigger/Befehle-Refactoring – alte Szenen (Actions/Events) sind inkompatibel.
@@ -15,6 +16,7 @@ interface StoreData {
   scenes: Scene[];
   variables: VariableDef[];
   nav: NavSettings;
+  ledDim: LedDimSettings;
   /** Persistierte Laufzeitwerte (Variablen mit persist=true). */
   varValues: Record<string, VarValue>;
 }
@@ -42,6 +44,7 @@ export class Store {
       scenes: [],
       variables: [],
       nav: { ...DEFAULT_NAV },
+      ledDim: { ...DEFAULT_LED_DIM, windows: DEFAULT_LED_DIM.windows.map((w) => ({ ...w })) },
       varValues: {},
     };
   }
@@ -76,6 +79,7 @@ export class Store {
           }));
       this.data.variables = parsed.variables ?? [];
       this.data.nav = { ...DEFAULT_NAV, ...parsed.nav };
+      this.data.ledDim = normalizeLedDim(parsed.ledDim);
       this.data.varValues = parsed.varValues ?? {};
 
       const migrated = !legacyWiped && (parsed.scenes ?? []).some((s) =>
@@ -115,6 +119,7 @@ export class Store {
       }));
       this.data.variables = parsed.variables ?? [];
       this.data.nav = { ...DEFAULT_NAV, ...parsed.nav };
+      this.data.ledDim = normalizeLedDim(parsed.ledDim);
       this.data.varValues = parsed.varValues ?? {};
       console.warn(`[Store] Wiederherstellung aus ${this.backupFile} erfolgreich.`);
       this.ensureModelIntegrity();
@@ -204,6 +209,7 @@ export class Store {
     }));
     this.data.variables = parsed.variables ?? [];
     this.data.nav = { ...DEFAULT_NAV, ...parsed.nav };
+    this.data.ledDim = normalizeLedDim(parsed.ledDim);
     this.data.varValues = parsed.varValues ?? {};
     this.ensureModelIntegrity();
     await this.persist();
@@ -238,6 +244,17 @@ export class Store {
     this.data.nav = { ...this.data.nav, ...patch };
     await this.persist();
     return this.getNav();
+  }
+
+  // ---- LED-Dimmung ---------------------------------------------------------
+  getLedDim(): LedDimSettings {
+    return normalizeLedDim(this.data.ledDim);
+  }
+
+  async updateLedDim(patch: Partial<LedDimSettings>): Promise<LedDimSettings> {
+    this.data.ledDim = normalizeLedDim({ ...this.data.ledDim, ...patch });
+    await this.persist();
+    return this.getLedDim();
   }
 
   // ---- Seiten ---------------------------------------------------------------

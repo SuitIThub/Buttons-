@@ -39,6 +39,7 @@ export async function buildServer(manager: DeviceManager): Promise<Server> {
         mqtt: manager.getMqttStatus(),
         settings: maskSettings(manager.store.getSettings()),
         nav: manager.store.getNav(),
+        ledDim: manager.store.getLedDim(),
         device: {
           id: cfg?.info?.id ?? null,
           firmware: cfg?.info?.firmware ?? null,
@@ -71,6 +72,16 @@ export async function buildServer(manager: DeviceManager): Promise<Server> {
       const nav = await manager.store.updateNav(req.body);
       manager.startRuntime();
       res.json(nav);
+    }),
+  );
+
+  api.get("/led-dim", asyncHandler(async (_req, res) => res.json(manager.store.getLedDim())));
+  api.put(
+    "/led-dim",
+    asyncHandler(async (req, res) => {
+      const ledDim = await manager.store.updateLedDim(req.body);
+      manager.applyLedDim();
+      res.json(ledDim);
     }),
   );
 

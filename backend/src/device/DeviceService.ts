@@ -84,6 +84,8 @@ export interface LedUpdate {
  */
 export class DeviceService {
   private config: DeviceConfig;
+  /** 0–1, multipliziert jede publizierte LED-Helligkeit (Nachtmodus). */
+  private ledBrightnessScale = 1;
 
   constructor(
     private mqtt: MqttService,
@@ -97,6 +99,17 @@ export class DeviceService {
    */
   updateConfig(config: Partial<DeviceConfig>): void {
     this.config = { ...this.config, ...config };
+  }
+
+  /**
+   * Skaliert alle folgenden LED-Brightness-Publishes (0 = aus, 1 = unverändert).
+   */
+  setLedBrightnessScale(scale: number): void {
+    this.ledBrightnessScale = Math.max(0, Math.min(1, scale));
+  }
+
+  getLedBrightnessScale(): number {
+    return this.ledBrightnessScale;
   }
 
   /** Aktuelle Device-Config zurückgeben. */
@@ -212,10 +225,10 @@ export class DeviceService {
     }
     if (led.on) {
       // Beim Einschalten immer eine gültige Helligkeit mitsenden.
-      const brightness = led.brightness ?? FULL_BRIGHTNESS;
-      this.publish(`${ledBase}/brightness/set`, String(this.clampByte(brightness)), retain);
+      const brightness = this.scaledLedBrightness(led.brightness ?? FULL_BRIGHTNESS);
+      this.publish(`${ledBase}/brightness/set`, String(brightness), retain);
     } else if (led.brightness !== undefined) {
-      this.publish(`${ledBase}/brightness/set`, String(this.clampByte(led.brightness)), retain);
+      this.publish(`${ledBase}/brightness/set`, String(this.scaledLedBrightness(led.brightness)), retain);
     }
     if (led.on !== undefined) {
       // On/Off ist ein String "true"/"false" (NICHT "1"/"0" oder boolean).
@@ -323,6 +336,11 @@ export class DeviceService {
   /** Begrenzt einen Wert auf 0-255 (Byte). */
   private clampByte(value: number): number {
     return Math.max(0, Math.min(255, Math.round(value)));
+  }
+
+  /** Wendet die globale LED-Skala an (Nachtmodus) und clamp't auf 0–255. */
+  private scaledLedBrightness(value: number): number {
+    return this.clampByte(value * this.ledBrightnessScale);
   }
 
   /**

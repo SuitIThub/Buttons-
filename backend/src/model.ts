@@ -512,6 +512,26 @@ export const DEFAULT_NAV: NavSettings = {
   homeTimeoutSeconds: 300,
 };
 
+/** Eine Zeitspanne (lokal, 24h, HH:MM). `start` nach `end` gilt über Mitternacht. */
+export interface LedDimWindow {
+  start: string;
+  end: string;
+}
+
+/** Zeitgesteuerte Reduktion der Button-LED-Helligkeit. */
+export interface LedDimSettings {
+  enabled: boolean;
+  /** Prozent der vollen LED-Helligkeit während aktiver Zeitspannen (0–100). */
+  brightnessPercent: number;
+  windows: LedDimWindow[];
+}
+
+export const DEFAULT_LED_DIM: LedDimSettings = {
+  enabled: false,
+  brightnessPercent: 20,
+  windows: [{ start: "22:00", end: "06:00" }],
+};
+
 export function defaultVarValue(type: VarType): VarValue {
   switch (type) {
     case "string":

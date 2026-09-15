@@ -26,15 +26,18 @@ import {
   TriggerType,
   EventGroup,
   NavSettings,
+  LedDimSettings,
   Page,
   VarValue,
   VarType,
   VariableDef,
   DEFAULT_NAV,
+  DEFAULT_LED_DIM,
   cookbookApiName,
   formatNumberMask,
 } from "../model.js";
 import { evaluate, interpolate, toBool, toNum, toStr } from "../engine/expr.js";
+import { ledBrightnessScale, msUntilNextLedDimChange, normalizeLedDim } from "../ledDim.js";
 
 /** Timeout für httpRequest-Befehle. */
 const HTTP_TIMEOUT_MS = 10_000;
@@ -63,6 +66,8 @@ export interface RuntimeState {
   system: Record<string, VarValue>;
   /** Letztes Ausführungsergebnis pro Befehl-ID (für UI-Feedback). */
   commandResults: Record<string, CommandResult>;
+  /** True, wenn die zeitgesteuerte LED-Dimmung gerade aktiv ist. */
+  ledDimActive: boolean;
 }
 
 export class AutomationRuntime extends EventEmitter {
@@ -72,6 +77,7 @@ export class AutomationRuntime extends EventEmitter {
   private scenes = new Map<string, Scene>();
   private scenesByPage: Scene[] = [];
   private nav: NavSettings = DEFAULT_NAV;
+  private ledDim: LedDimSettings = DEFAULT_LED_DIM;
   private currentPage = 0;
   private overrides: SceneOverrides = emptyOverrides();
 
@@ -92,6 +98,8 @@ export class AutomationRuntime extends EventEmitter {
   private homeTimeoutMs = 0;
   /** Timer für den Idle-Rücksprung; wird bei jeder Eingabe/Seitenwechsel erneuert. */
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Timer bis zum nächsten LED-Dimm-Fensterwechsel. */
+  private ledDimTimer: ReturnType<typeof setTimeout> | null = null;
   private lastVarValues = new Map<string, VarValue>();
   /** Letztes Ergebnis pro Befehl-ID. */
   private lastResults = new Map<string, CommandResult>();
@@ -145,6 +153,7 @@ export class AutomationRuntime extends EventEmitter {
     scenes: Scene[],
     nav: NavSettings,
     pages: Page[] = [],
+    ledDim: LedDimSettings = DEFAULT_LED_DIM,
   ): void {
     this.deactivate();
     this.device.resetPublishCache();
@@ -152,6 +161,7 @@ export class AutomationRuntime extends EventEmitter {
     this.config = config;
     this.scenes = new Map(scenes.map((s) => [s.id, s]));
     this.nav = nav;
+    this.ledDim = normalizeLedDim(ledDim);
     this.active = true;
     this.overrides = emptyOverrides();
     this.lastResults.clear();
@@ -194,6 +204,8 @@ export class AutomationRuntime extends EventEmitter {
     this.fireGlobalTriggers("startup");
 
     this.setupTimers();
+    this.device.setLedBrightnessScale(ledBrightnessScale(this.ledDim));
+    this.scheduleLedDimTimer();
     this.scheduleIdleReset();
 
     const scene = this.currentScene();
@@ -228,6 +240,7 @@ export class AutomationRuntime extends EventEmitter {
       variables: this.vars.snapshot(),
       system: this.vars.systemSnapshot(),
       commandResults: Object.fromEntries(this.lastResults),
+      ledDimActive: this.device.getLedBrightnessScale() < 1,
     };
   }
 
@@ -1251,6 +1264,51 @@ export class AutomationRuntime extends EventEmitter {
       clearTimeout(this.idleTimer);
       this.idleTimer = null;
     }
+    if (this.ledDimTimer) {
+      clearTimeout(this.ledDimTimer);
+      this.ledDimTimer = null;
+    }
+  }
+
+  /**
+   * Übernimmt neue LED-Dimm-Einstellungen ohne Runtime-Neustart.
+   */
+  setLedDim(settings: LedDimSettings): void {
+    this.ledDim = normalizeLedDim(settings);
+    this.syncLedDim(true);
+  }
+
+  /**
+   * Setzt die LED-Helligkeitsskala gemäß aktueller Uhrzeit. Bei Änderung
+   * (oder `rerender`) werden die Button-LEDs neu publiziert.
+   */
+  private syncLedDim(rerender: boolean): void {
+    const prevByte = Math.round(this.device.getLedBrightnessScale() * 255);
+    const nextScale = ledBrightnessScale(this.ledDim);
+    const nextByte = Math.round(nextScale * 255);
+    this.device.setLedBrightnessScale(nextScale);
+    this.scheduleLedDimTimer();
+    if (prevByte !== nextByte) {
+      console.log(`[Runtime] LED-Helligkeit ${nextByte}/255 (${this.ledDim.enabled ? "Zeitplan" : "aus"})`);
+      if (this.active) this.render();
+      this.scheduleStateEmit();
+    } else if (rerender && this.active) {
+      this.render();
+    }
+  }
+
+  private scheduleLedDimTimer(): void {
+    if (this.ledDimTimer) {
+      clearTimeout(this.ledDimTimer);
+      this.ledDimTimer = null;
+    }
+    if (!this.active) return;
+    const ms = msUntilNextLedDimChange(this.ledDim);
+    if (ms === null) return;
+    this.ledDimTimer = setTimeout(() => {
+      this.ledDimTimer = null;
+      this.syncLedDim(true);
+    }, ms);
   }
 
   // ==================== RENDER CONFIG ====================
