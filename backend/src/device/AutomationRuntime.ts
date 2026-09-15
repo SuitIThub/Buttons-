@@ -37,7 +37,7 @@ import {
   formatNumberMask,
 } from "../model.js";
 import { evaluate, interpolate, toBool, toNum, toStr } from "../engine/expr.js";
-import { ledBrightnessScale, msUntilNextLedDimChange, normalizeLedDim } from "../ledDim.js";
+import { ledBrightnessScale, zonedClock, normalizeLedDim } from "../ledDim.js";
 
 /** Timeout für httpRequest-Befehle. */
 const HTTP_TIMEOUT_MS = 10_000;
@@ -99,7 +99,7 @@ export class AutomationRuntime extends EventEmitter {
   /** Timer für den Idle-Rücksprung; wird bei jeder Eingabe/Seitenwechsel erneuert. */
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   /** Timer bis zum nächsten LED-Dimm-Fensterwechsel. */
-  private ledDimTimer: ReturnType<typeof setTimeout> | null = null;
+  private ledDimTimer: ReturnType<typeof setInterval> | null = null;
   private lastVarValues = new Map<string, VarValue>();
   /** Letztes Ergebnis pro Befehl-ID. */
   private lastResults = new Map<string, CommandResult>();
@@ -1265,7 +1265,7 @@ export class AutomationRuntime extends EventEmitter {
       this.idleTimer = null;
     }
     if (this.ledDimTimer) {
-      clearTimeout(this.ledDimTimer);
+      clearInterval(this.ledDimTimer);
       this.ledDimTimer = null;
     }
   }
@@ -1289,7 +1289,10 @@ export class AutomationRuntime extends EventEmitter {
     this.device.setLedBrightnessScale(nextScale);
     this.scheduleLedDimTimer();
     if (prevByte !== nextByte) {
-      console.log(`[Runtime] LED-Helligkeit ${nextByte}/255 (${this.ledDim.enabled ? "Zeitplan" : "aus"})`);
+      const clock = zonedClock(this.ledDim.timeZone ?? "Europe/Berlin");
+      console.log(
+        `[Runtime] LED-Helligkeit ${nextByte}/255 (${Math.round(nextScale * 100)} %) · ${clock.hhmm} ${this.ledDim.timeZone ?? "Europe/Berlin"} · ${this.ledDim.enabled ? "Zeitplan an" : "aus"}`,
+      );
       if (this.active) this.render();
       this.scheduleStateEmit();
     } else if (rerender && this.active) {
@@ -1299,16 +1302,12 @@ export class AutomationRuntime extends EventEmitter {
 
   private scheduleLedDimTimer(): void {
     if (this.ledDimTimer) {
-      clearTimeout(this.ledDimTimer);
+      clearInterval(this.ledDimTimer);
       this.ledDimTimer = null;
     }
-    if (!this.active) return;
-    const ms = msUntilNextLedDimChange(this.ledDim);
-    if (ms === null) return;
-    this.ledDimTimer = setTimeout(() => {
-      this.ledDimTimer = null;
-      this.syncLedDim(true);
-    }, ms);
+    if (!this.active || !this.ledDim.enabled) return;
+    // Kurzes Polling statt einmaligem Timeout: unabhängig von Server-UTC/DST.
+    this.ledDimTimer = setInterval(() => this.syncLedDim(false), 15_000);
   }
 
   // ==================== RENDER CONFIG ====================

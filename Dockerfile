@@ -18,6 +18,8 @@ RUN npm run build
 FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+ENV TZ=Europe/Berlin
+RUN apk add --no-cache tzdata
 COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=backend /app/backend/dist ./dist

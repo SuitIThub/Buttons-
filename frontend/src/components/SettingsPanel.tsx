@@ -7,12 +7,48 @@ import { connectorLabel } from "../lib/helpers";
 const DEFAULT_LED_DIM: LedDimSettings = {
   enabled: false,
   brightnessPercent: 20,
+  timeZone: "Europe/Berlin",
   windows: [{ start: "22:00", end: "06:00" }],
 };
 
 function toTimeValue(value: string | undefined): string {
   const v = (value ?? "").slice(0, 5);
   return /^\d{2}:\d{2}$/.test(v) ? v : "22:00";
+}
+
+function zonedHhmm(timeZone: string, at = new Date()): string {
+  try {
+    return new Intl.DateTimeFormat("de-DE", {
+      timeZone: timeZone || "Europe/Berlin",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(at);
+  } catch {
+    return new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(at);
+  }
+}
+
+function parseMinutes(value: string | undefined): number | null {
+  const m = /^(\d{1,2}):(\d{2})/.exec((value ?? "").trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return h * 60 + min;
+}
+
+function isDimWindowActive(ledDim: LedDimSettings, at = new Date()): boolean {
+  if (!ledDim.enabled) return false;
+  const [hh, mm] = zonedHhmm(ledDim.timeZone ?? "Europe/Berlin", at).split(":").map(Number);
+  const now = hh * 60 + mm;
+  return (ledDim.windows ?? []).some((w) => {
+    const s = parseMinutes(w.start);
+    const e = parseMinutes(w.end);
+    if (s === null || e === null || s === e) return false;
+    if (s < e) return now >= s && now < e;
+    return now >= s || now < e;
+  });
 }
 
 export function SettingsPanel({
@@ -72,6 +108,7 @@ export function SettingsPanel({
   const [nav, setNav] = useState<NavSettings>({ wrap: false, ledOnHex: "#00ff00", ledOffHex: "#ff0000", homePageId: "", homeTimeoutSeconds: 300 });
   const [ledDim, setLedDim] = useState<LedDimSettings>(DEFAULT_LED_DIM);
   const [saving, setSaving] = useState(false);
+  const [clockTick, setClockTick] = useState(0);
   const ledDimTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ledDimRef = useRef(ledDim);
   ledDimRef.current = ledDim;
@@ -92,6 +129,11 @@ export function SettingsPanel({
 
   useEffect(() => () => {
     if (ledDimTimer.current) clearTimeout(ledDimTimer.current);
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => setClockTick((n) => n + 1), 15_000);
+    return () => clearInterval(id);
   }, []);
 
   const set = (patch: Partial<Settings>) => setForm((f) => ({ ...f, ...patch }));
@@ -156,6 +198,11 @@ export function SettingsPanel({
   const addWindow = () => {
     saveLedDim({ windows: [...ledDimRef.current.windows, { start: "22:00", end: "06:00" }] });
   };
+
+  const tz = ledDim.timeZone || "Europe/Berlin";
+  void clockTick;
+  const dimNowActive = isDimWindowActive(ledDim) || Boolean(runtime?.ledDimActive);
+  const dimClock = zonedHhmm(tz);
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -325,9 +372,14 @@ export function SettingsPanel({
               />
               Button-LEDs in Zeitspannen reduzieren
             </label>
-            {runtime?.ledDimActive && (
-              <p className="text-xs text-amber-300">Aktuell aktiv — alle Button-LEDs sind reduziert.</p>
-            )}
+            <p className={`text-xs ${dimNowActive ? "text-amber-300" : "text-slate-500"}`}>
+              Jetzt {dimClock} ({tz})
+              {ledDim.enabled
+                ? dimNowActive
+                  ? " — Dimmung aktiv, LEDs reduziert."
+                  : " — außerhalb der Zeitspannen, volle Helligkeit."
+                : " — Dimmung aus."}
+            </p>
             <Field label={`Helligkeit in den Zeitspannen (${ledDim.brightnessPercent} %)`}>
               <input
                 type="range"
@@ -375,8 +427,9 @@ export function SettingsPanel({
               </Button>
             </div>
             <p className="text-xs text-slate-500">
-              Gilt für alle Button-LEDs (Front, Wand, Navigation). Zeitspannen über Mitternacht
-              sind möglich, z. B. 22:00–06:00. Die Display-Helligkeit bleibt unverändert.
+              Gilt für alle Button-LEDs (Front, Wand, Navigation). Zeiten gelten in Europe/Berlin,
+              unabhängig von der Server-Uhr. Spannen über Mitternacht sind möglich, z. B. 22:00–06:00.
+              Die Display-Helligkeit bleibt unverändert.
             </p>
           </div>
         </Card>

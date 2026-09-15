@@ -45,6 +45,8 @@ export interface LedDimSettings {
   enabled: boolean;
   /** Prozent der vollen LED-Helligkeit während aktiver Zeitspannen (0–100). */
   brightnessPercent: number;
+  /** IANA-Zeitzone für die Zeitspannen. Default Europe/Berlin. */
+  timeZone?: string;
   windows: LedDimWindow[];
 }
 

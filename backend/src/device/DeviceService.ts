@@ -102,10 +102,16 @@ export class DeviceService {
   }
 
   /**
-   * Skaliert alle folgenden LED-Brightness-Publishes (0 = aus, 1 = unverändert).
+   * Skaliert alle folgenden LED-Publishes (0 = aus, 1 = unverändert).
+   * RGB und Brightness werden multipliziert; der Publish-Cache für LED-Topics
+   * wird verworfen, damit das Gerät rgb+brightness+on erneut bekommt.
    */
   setLedBrightnessScale(scale: number): void {
-    this.ledBrightnessScale = Math.max(0, Math.min(1, scale));
+    const next = Math.max(0, Math.min(1, scale));
+    if (next !== this.ledBrightnessScale) {
+      this.invalidateLedPublishCache();
+    }
+    this.ledBrightnessScale = next;
   }
 
   getLedBrightnessScale(): number {
@@ -220,13 +226,15 @@ export class DeviceService {
     const ledBase = `${this.buttonPageTopic(buttonId, pageIndex)}/led/${side}`;
 
     // RGB zuerst, dann Helligkeit, dann on – alle Werte als String.
+    // Dimmen: RGB und Brightness skalieren. `on` nach Helligkeitswechsel
+    // immer erneut senden — die Firmware übernimmt brightness oft nur mit `on`.
     if (led.color !== undefined) {
-      this.publish(`${ledBase}/rgb/set`, String(this.hexToDecimal(led.color)), retain);
+      this.publish(`${ledBase}/rgb/set`, String(this.hexToDecimal(this.scaleHexColor(led.color))), retain);
     }
     if (led.on) {
-      // Beim Einschalten immer eine gültige Helligkeit mitsenden.
       const brightness = this.scaledLedBrightness(led.brightness ?? FULL_BRIGHTNESS);
       this.publish(`${ledBase}/brightness/set`, String(brightness), retain);
+      this.lastPublished.delete(`${ledBase}/on/set`);
     } else if (led.brightness !== undefined) {
       this.publish(`${ledBase}/brightness/set`, String(this.scaledLedBrightness(led.brightness)), retain);
     }
@@ -341,6 +349,24 @@ export class DeviceService {
   /** Wendet die globale LED-Skala an (Nachtmodus) und clamp't auf 0–255. */
   private scaledLedBrightness(value: number): number {
     return this.clampByte(value * this.ledBrightnessScale);
+  }
+
+  /** Skaliert eine Hex-Farbe kanalweise (0–1). */
+  private scaleHexColor(hex: string): string {
+    if (this.ledBrightnessScale >= 0.999) return hex;
+    const n = this.hexToDecimal(hex);
+    const s = this.ledBrightnessScale;
+    const r = this.clampByte(((n >> 16) & 255) * s);
+    const g = this.clampByte(((n >> 8) & 255) * s);
+    const b = this.clampByte((n & 255) * s);
+    return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+  }
+
+  /** Verwirft gecachte LED-Publishes, damit Dimmen rgb/brightness/on neu sendet. */
+  private invalidateLedPublishCache(): void {
+    for (const topic of [...this.lastPublished.keys()]) {
+      if (topic.includes("/led/")) this.lastPublished.delete(topic);
+    }
   }
 
   /**

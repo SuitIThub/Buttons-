@@ -6,6 +6,7 @@ services:
       - "6789:6789"
     environment:
       PORT: 6789
+      TZ: Europe/Berlin
       # Diese Werte können auch später in der Weboberfläche gesetzt werden.
       BUTTONPLUS_DEVICE_IP: ${BUTTONPLUS_DEVICE_IP:-}
       MQTT_URL: ${MQTT_URL:-}

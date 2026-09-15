@@ -50,11 +50,14 @@ mqtt.reset();
 svc.resetPublishCache();
 svc.setLedBrightnessScale(0.2);
 svc.setButtonColor(2, 0, "#FF0000");
+check("rgb 20% → 0x330000", mqtt.pubs[0], { topic: "buttonplus/btn_9182a0/button/3-1/led/front/rgb/set", payload: "3342336", retain: true });
 check("brightness 20% → 51", mqtt.pubs[1], { topic: "buttonplus/btn_9182a0/button/3-1/led/front/brightness/set", payload: "51", retain: true });
+check("on erneut 'true'", mqtt.pubs[2], { topic: "buttonplus/btn_9182a0/button/3-1/led/front/on/set", payload: "true", retain: true });
 svc.setLedBrightnessScale(1);
 svc.resetPublishCache();
 mqtt.reset();
 svc.setButtonColor(2, 0, "#FF0000");
+check("scale 1 → rgb voll", mqtt.pubs[0], { topic: "buttonplus/btn_9182a0/button/3-1/led/front/rgb/set", payload: "16711680", retain: true });
 check("scale 1 → brightness 255", mqtt.pubs[1], { topic: "buttonplus/btn_9182a0/button/3-1/led/front/brightness/set", payload: "255", retain: true });
 
 console.log("\n=== DeviceService: LED off (both sides) ===");
@@ -190,6 +193,7 @@ console.log("\n=== LED-Dimmung: Zeitfenster ===");
   const dim = normalizeLedDim({
     enabled: true,
     brightnessPercent: 20,
+    timeZone: "UTC",
     windows: [{ start: "22:00", end: "06:00" }, { start: "12:00", end: "13:00" }],
   });
   check("Overnight 23:00 aktiv", isInLedDimWindow(23 * 60, "22:00", "06:00"), true);
@@ -198,10 +202,11 @@ console.log("\n=== LED-Dimmung: Zeitfenster ===");
   check("Overnight 12:00 inaktiv", isInLedDimWindow(12 * 60, "22:00", "06:00"), false);
   check("Mittag 12:30 aktiv", isInLedDimWindow(12 * 60 + 30, "12:00", "13:00"), true);
   check("identische Zeiten inaktiv", isInLedDimWindow(12 * 60, "12:00", "12:00"), false);
+  check("HH:MM:SS parsebar", isInLedDimWindow(18 * 60, "18:00:00", "22:00:00"), true);
 
-  const noon = new Date(2026, 0, 1, 12, 30, 0);
-  const evening = new Date(2026, 0, 1, 23, 0, 0);
-  const morning = new Date(2026, 0, 1, 8, 0, 0);
+  const noon = new Date(Date.UTC(2026, 0, 1, 12, 30, 0));
+  const evening = new Date(Date.UTC(2026, 0, 1, 23, 0, 0));
+  const morning = new Date(Date.UTC(2026, 0, 1, 8, 0, 0));
   check("aktiv mittags (zweites Fenster)", isLedDimActive(dim, noon), true);
   check("aktiv nachts", isLedDimActive(dim, evening), true);
   check("inaktiv vormittags", isLedDimActive(dim, morning), false);
@@ -211,8 +216,19 @@ console.log("\n=== LED-Dimmung: Zeitfenster ===");
   const disabled = normalizeLedDim({ ...dim, enabled: false });
   check("deaktiviert → Skala 1", ledBrightnessScale(disabled, evening), 1);
 
-  const until = msUntilNextLedDimChange(dim, new Date(2026, 0, 1, 21, 59, 30));
+  const until = msUntilNextLedDimChange(dim, new Date(Date.UTC(2026, 0, 1, 21, 59, 30)));
   check("nächster Wechsel in 30s", until, 30_000);
+
+  const berlin = normalizeLedDim({
+    enabled: true,
+    brightnessPercent: 20,
+    timeZone: "Europe/Berlin",
+    windows: [{ start: "18:00", end: "22:00" }],
+  });
+  // Winter: UTC+1 → 17:00Z = 18:00 Berlin. Sommer: UTC+2 → 16:00Z = 18:00 Berlin.
+  check("Berlin 18–22 aktiv 17:00 UTC Winter", isLedDimActive(berlin, new Date("2026-01-15T17:30:00Z")), true);
+  check("Berlin 18–22 inaktiv 16:00 UTC Winter", isLedDimActive(berlin, new Date("2026-01-15T16:30:00Z")), false);
+  check("Berlin 18–22 aktiv 16:30 UTC Sommer (Prod-Fall)", isLedDimActive(berlin, new Date("2026-07-15T16:30:00Z")), true);
 }
 
 console.log(`\n=== Result: ${pass} passed, ${fail} failed ===`);
