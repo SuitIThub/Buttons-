@@ -269,8 +269,8 @@ export function SettingsPanel({
             <Button onClick={onDeploy}>Auf Gerät deployen</Button>
           </div>
           <p className="mt-3 text-xs text-slate-500">
-            „Deployen“ übersetzt Seiten, Szenen und Logik automatisch in die Gerätekonfiguration und
-            alle MQTT-Topics – du musst dich nie mit Topics befassen.
+            „Deployen“ schreibt das Layout aufs Gerät: Seiten, Display-Elemente und welche Buttons
+            es dort gibt. Texte, LEDs und Event-Gruppen übernimmt der Manager direkt nach dem Speichern.
           </p>
 
           <div className="mt-3 border-t border-white/10 pt-3">
@@ -293,7 +293,7 @@ export function SettingsPanel({
             <p className="mt-2 text-xs text-slate-500">
               Sichert bzw. lädt die komplette Konfiguration (Seiten, Szenen, Variablen, Einstellungen).
               Import <span className="text-amber-300">ersetzt</span> alles und enthält Zugangsdaten im
-              Klartext. Danach „Auf Gerät deployen“, um die Änderungen aufs Gerät zu bringen.
+              Klartext. Liegt das Layout danach anders auf dem Gerät, fordert der Manager ein Deploy.
             </p>
           </div>
         </Card>

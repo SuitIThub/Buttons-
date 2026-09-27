@@ -181,7 +181,7 @@ export default function App() {
 
       {status?.undeployed && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
-          <span>⚠️ Es gibt gespeicherte Änderungen, die noch nicht auf das Gerät deployt wurden.</span>
+          <span>⚠️ Layout-Änderungen sind noch nicht auf dem Gerät. Texte, LEDs und Event-Gruppen gelten schon.</span>
           <Button variant="subtle" className="ml-auto" onClick={deploy}>Jetzt deployen</Button>
         </div>
       )}

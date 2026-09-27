@@ -33,6 +33,58 @@ export interface DeviceConfigInput {
   baseTopic?: string;
 }
 
+/**
+ * Fingerprint der Gerätekonfiguration, die ein Deploy schreiben würde.
+ *
+ * Enthalten ist nur, was auf dem Gerät selbst liegen muss: Display-Layout,
+ * welche Buttons pro Seite existieren, Seiten-Topics, Akzentfarbe, Broker.
+ * Texte, LEDs, Icons und Event-Gruppen laufen zur Laufzeit über den Manager
+ * und ändern den Fingerprint nicht.
+ */
+export function deployFingerprint(output: DeviceConfigOutput): string {
+  const cfg = output.config;
+  const displays = [...(cfg.mqttdisplays ?? [])]
+    .map((d) => ({
+      id: String(d.displayitemid ?? ""),
+      page: d.page,
+      x: d.x,
+      y: d.y,
+      width: d.width,
+      fontsize: d.fontsize,
+      align: d.align,
+      color: d.color ?? 0,
+      boxtype: d.boxtype ?? 0,
+      topics: (d.topics ?? []).map((t) => `${t.eventtype}|${t.topic}`).sort(),
+    }))
+    .sort((a, b) => a.page - b.page || a.id.localeCompare(b.id));
+
+  const buttons = [...(cfg.mqttbuttons ?? [])]
+    .map((b) => ({
+      id: String(b.buttonid ?? b.id ?? ""),
+      page: b.page ?? 0,
+      position: b.position ?? 0,
+      topics: (b.topics ?? []).map((t) => `${t.eventtype}|${t.topic}`).sort(),
+    }))
+    .sort((a, b) => a.page - b.page || a.position - b.position || a.id.localeCompare(b.id));
+
+  const broker = (cfg.mqttbrokers ?? []).find((b) => b.brokerid === "buttonplus") ?? cfg.mqttbrokers?.[0];
+
+  return JSON.stringify({
+    coreColor: cfg.core?.color ?? 0,
+    coreTopics: (cfg.core?.topics ?? []).map((t) => `${t.eventtype}|${t.topic}`).sort(),
+    broker: broker
+      ? {
+          url: broker.url,
+          port: broker.port,
+          username: broker.username ?? "",
+          password: broker.password ?? "",
+        }
+      : null,
+    displays,
+    buttons,
+  });
+}
+
 export interface DeviceConfigOutput {
   /** Modifizierte Device-Config (bereit für Push) */
   config: BPConfig;

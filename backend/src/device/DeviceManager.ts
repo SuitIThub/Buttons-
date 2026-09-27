@@ -21,7 +21,7 @@ import { MqttService } from "../buttonplus/mqttService.js";
 import { DeviceService } from "./DeviceService.js";
 import { SceneRenderer } from "./SceneRenderer.js";
 import { AutomationRuntime } from "./AutomationRuntime.js";
-import { DeviceConfigBuilder, DeviceConfigOutput } from "./DeviceConfigBuilder.js";
+import { deployFingerprint, DeviceConfigBuilder, DeviceConfigOutput } from "./DeviceConfigBuilder.js";
 import { VariableState } from "../engine/variables.js";
 import { BPConfig } from "../buttonplus/types.js";
 import { ConfigDialect, detectDialect, toCanonical, toDevice } from "../buttonplus/schema.js";
@@ -46,16 +46,44 @@ export class DeviceManager {
   private dialect: ConfigDialect = "v2";
   private mqttWasConnected = false;
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
-  /** True, sobald das Modell geändert, aber noch nicht aufs Gerät deployed wurde. */
+  /** True, wenn die kompilierte Gerätekonfiguration vom letzten Deploy abweicht. */
   private undeployed = false;
+  /** Fingerprint der Konfiguration, die zuletzt auf dem Gerät liegt (bzw. beim Start). */
+  private deployedFingerprint: string | null = null;
 
-  /** Markiert nicht-deployte Modelländerungen (Szenen/Seiten). */
-  markUndeployed(): void {
-    this.undeployed = true;
+  /**
+   * Setzt das Deploy-Flag anhand der kompilierten Gerätekonfiguration.
+   * Event-Gruppen, Texte, LEDs und Icons ändern sie nicht — dafür bleibt das
+   * Flag aus. Layout, Seiten und neue Buttons setzen es.
+   */
+  refreshUndeployed(): void {
+    const fp = this.tryFingerprint();
+    if (fp === null) return;
+    if (this.deployedFingerprint === null) {
+      this.deployedFingerprint = fp;
+      return;
+    }
+    this.undeployed = fp !== this.deployedFingerprint;
   }
 
   hasUndeployedChanges(): boolean {
     return this.undeployed;
+  }
+
+  private tryFingerprint(): string | null {
+    try {
+      return deployFingerprint(this.compile());
+    } catch {
+      return null;
+    }
+  }
+
+  /** Merkt die aktuelle Kompilation als „auf dem Gerät“ (nach Deploy oder beim Start). */
+  private captureDeployBaseline(): void {
+    const fp = this.tryFingerprint();
+    if (fp === null) return;
+    this.deployedFingerprint = fp;
+    this.undeployed = false;
   }
 
   /** Sichert persist=true-Variablenwerte gebündelt (debounced). */
@@ -125,8 +153,10 @@ export class DeviceManager {
       console.warn("[Manager] Device offline - Config Pull fehlgeschlagen");
     }
 
-    // Runtime starten (best-effort)
+    // Runtime starten (best-effort). Der Stand jetzt gilt als deployt, bis sich
+    // die Gerätekonfiguration (nicht die reine Manager-Logik) ändert.
     this.startRuntime();
+    this.captureDeployBaseline();
   }
 
   // ==================== DEVICE CONFIG ====================
@@ -282,7 +312,7 @@ export class DeviceManager {
     this.runtime.syncDevicePage();
     this.runtime.render();
 
-    this.undeployed = false;
+    this.captureDeployBaseline();
     console.log("[Deploy] Deployment complete!");
 
     return {

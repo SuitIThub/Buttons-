@@ -144,7 +144,8 @@ export function SceneConfigurator({
           />
           <p className="text-xs text-slate-500">
             Buttons 3-4 paginieren durch die Elemente. Buttons 5-8 senden das Element an die
-            CookBook-Sammeleinkaufsliste. Änderungen wirken nach Speichern + Deploy.
+            CookBook-Sammeleinkaufsliste. Einträge und Texte gelten nach dem Speichern.
+            Ein Deploy ist nur nötig, wenn die Szene neu einer Seite zugewiesen wird.
           </p>
         </>
       ) : (
@@ -208,8 +209,8 @@ export function SceneConfigurator({
           )}
 
           <p className="text-xs text-slate-500">
-            Struktur-Änderungen (Elemente, Buttons-Anzahl) wirken nach einem Deploy. Werte/LEDs/Labels
-            aktualisieren sich live nach dem Speichern.
+            Ein Deploy ist nur für das Layout nötig (Display-Position, Größe, Farbe, neue oder entfernte
+            Elemente und Buttons, Seiten). Texte, LEDs und Event-Gruppen gelten direkt nach dem Speichern.
           </p>
         </>
       )}

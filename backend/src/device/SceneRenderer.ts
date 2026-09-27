@@ -91,19 +91,70 @@ export class SceneRenderer {
   renderScene(scene: Scene, config: SceneRenderConfig, cookbookState?: CookBookRuntimeState): void {
     console.log(`[SceneRenderer] Rendering scene "${scene.name}" on page ${config.currentPage}`);
 
-    if (scene.category === "cookbook" && scene.cookbook) {
-      this.renderCookBookScene(scene, config, cookbookState);
-    } else {
-      const scope = this.getVariableScope();
-      this.renderDisplayItems(scene, config, scope);
-      this.renderButtons(scene, config, scope);
-    }
+    // Firmware-Fehler (V2/V3): Ändert oder leert man ein Button-Label, schreibt das
+    // Gerät den BISHERIGEN Button-Text auf das große Display. Deshalb zuerst die
+    // Buttons publizieren und das Hauptdisplay danach (und noch einmal kurz später)
+    // erneut setzen — sonst bleibt der alte Button-Text dort hängen. Dedup
+    // überspringt unveränderte Display-Topics, darum den Display-Cache verwerfen,
+    // sobald wirklich ein Button-Text rausging.
+    const cookbook = scene.category === "cookbook" && scene.cookbook;
+    let buttonTextSent = cookbook
+      ? this.renderCookBookButtons(scene, config, cookbookState)
+      : this.renderButtons(scene, config, this.getVariableScope());
 
     if (config.navButtons) {
-      this.renderNavigationButtons(config);
+      buttonTextSent = this.renderNavigationButtons(config) || buttonTextSent;
     }
 
+    if (buttonTextSent) this.device.invalidateDisplayPublishCache();
+
+    if (cookbook) this.renderCookBookDisplay(scene, config, cookbookState);
+    else this.renderDisplayItems(scene, config);
+
+    if (buttonTextSent) this.scheduleDisplayRepair(scene, config, cookbookState);
+    else if (this.displayRepairTimer) this.pendingDisplayRepair = { scene, config, cookbookState };
+
     console.log(`[SceneRenderer] Rendering complete`);
+  }
+
+  /** Bricht einen noch ausstehenden Display-Refresh ab (Runtime-Stop). */
+  cancelPendingDisplayRepair(): void {
+    if (this.displayRepairTimer) {
+      clearTimeout(this.displayRepairTimer);
+      this.displayRepairTimer = null;
+    }
+    this.pendingDisplayRepair = null;
+  }
+
+  private displayRepairTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingDisplayRepair: {
+    scene: Scene;
+    config: SceneRenderConfig;
+    cookbookState?: CookBookRuntimeState;
+  } | null = null;
+
+  /** Zweites Setzen des Hauptdisplays, nachdem die Firmware den Leak angewendet hat. */
+  private scheduleDisplayRepair(
+    scene: Scene,
+    config: SceneRenderConfig,
+    cookbookState?: CookBookRuntimeState,
+  ): void {
+    this.pendingDisplayRepair = { scene, config, cookbookState };
+    if (this.displayRepairTimer) clearTimeout(this.displayRepairTimer);
+    const timer = setTimeout(() => {
+      this.displayRepairTimer = null;
+      const job = this.pendingDisplayRepair;
+      this.pendingDisplayRepair = null;
+      if (!job) return;
+      this.device.invalidateDisplayPublishCache();
+      if (job.scene.category === "cookbook" && job.scene.cookbook) {
+        this.renderCookBookDisplay(job.scene, job.config, job.cookbookState);
+      } else {
+        this.renderDisplayItems(job.scene, job.config);
+      }
+    }, 350);
+    timer.unref?.();
+    this.displayRepairTimer = timer;
   }
 
   // ==================== COOKBOOK ====================
@@ -119,13 +170,14 @@ export class SceneRenderer {
   private static readonly CB_LIST_ROWS = 5;
 
   /**
-   * Rendert eine CookBook-Szene: Titel, Sammellisteninhalt, Paginierung, Buttons.
+   * Rendert die CookBook-Buttons (Items + Paginierung).
+   * @returns true, wenn ein Label tatsächlich publiziert wurde
    */
-  private renderCookBookScene(
+  private renderCookBookButtons(
     scene: Scene,
     config: SceneRenderConfig,
     cbState?: CookBookRuntimeState,
-  ): void {
+  ): boolean {
     const cb = scene.cookbook!;
     const state = cbState ?? { itemPage: 0, listItems: [] };
     const page = config.currentPage;
@@ -133,7 +185,67 @@ export class SceneRenderer {
 
     console.log(`[SceneRenderer:CookBook] items=${cb.items.length}, itemPage=${state.itemPage}/${totalItemPages}, systemPage=${page}`);
 
-    // Display-Items rendern (Titel, Listen-Inhalt, Paginierung)
+    let sent = false;
+
+    // Item-Buttons (IDs 4-7)
+    const offset = state.itemPage * SceneRenderer.CB_ITEMS_PER_PAGE;
+    for (let i = 0; i < SceneRenderer.CB_ITEMS_PER_PAGE; i++) {
+      const btnId = SceneRenderer.CB_ITEM_BUTTON_START + i;
+      const item = cb.items[offset + i];
+      if (item) {
+        const displayName = cookbookDisplayName(item.name);
+        console.log(`[SceneRenderer:CookBook] Button ${btnId} (pos ${btnId + 1}) label="${displayName}"`);
+        sent = this.device.updateButton(btnId, { label: displayName, topLabel: "" }) || sent;
+        this.device.setButtonSvg(btnId, page, "");
+        // LED-Feedback: grün = noch nicht auf der Liste, gelb = bereits drauf.
+        // Verglichen wird der API-Name (ohne „~"), wie er in der Liste steht.
+        const listName = cookbookApiName(item.name).trim().toLowerCase();
+        const inList = state.listItems.some((n) => n.trim().toLowerCase() === listName);
+        this.device.setButtonColor(btnId, page, inList ? "#ffff00" : "#00ff00");
+      } else {
+        sent = this.device.clearButton(btnId, page) || sent;
+        this.device.ledOff(btnId, page);
+      }
+    }
+
+    // Paginierungs-Buttons (IDs 2-3)
+    const canPrev = state.itemPage > 0;
+    const canNext = state.itemPage < totalItemPages - 1;
+
+    sent = this.device.updateButton(SceneRenderer.CB_PAGE_PREV, {
+      label: canPrev ? "<<" : "", topLabel: "",
+    }) || sent;
+    this.device.setButtonSvg(SceneRenderer.CB_PAGE_PREV, page, "");
+    if (canPrev) {
+      this.device.setButtonColor(SceneRenderer.CB_PAGE_PREV, page, "#00ff00");
+    } else {
+      this.device.ledOff(SceneRenderer.CB_PAGE_PREV, page);
+    }
+
+    sent = this.device.updateButton(SceneRenderer.CB_PAGE_NEXT, {
+      label: canNext ? ">>" : "", topLabel: "",
+    }) || sent;
+    this.device.setButtonSvg(SceneRenderer.CB_PAGE_NEXT, page, "");
+    if (canNext) {
+      this.device.setButtonColor(SceneRenderer.CB_PAGE_NEXT, page, "#00ff00");
+    } else {
+      this.device.ledOff(SceneRenderer.CB_PAGE_NEXT, page);
+    }
+
+    return sent;
+  }
+
+  /** Hauptdisplay einer CookBook-Szene: Titel, Sammelliste, Paginierung. */
+  private renderCookBookDisplay(
+    scene: Scene,
+    config: SceneRenderConfig,
+    cbState?: CookBookRuntimeState,
+  ): void {
+    const cb = scene.cookbook!;
+    const state = cbState ?? { itemPage: 0, listItems: [], itemIds: {} };
+    const page = config.currentPage;
+    const totalItemPages = Math.max(1, Math.ceil(cb.items.length / SceneRenderer.CB_ITEMS_PER_PAGE));
+
     const mappings = config.displayMappings.filter(
       (m) => m.sceneId === scene.id && m.pageIndex === page,
     );
@@ -165,51 +277,6 @@ export class SceneRenderer {
           label: "", value, unit: "", svg: "",
         });
       }
-    }
-
-    // Item-Buttons (IDs 4-7)
-    const offset = state.itemPage * SceneRenderer.CB_ITEMS_PER_PAGE;
-    for (let i = 0; i < SceneRenderer.CB_ITEMS_PER_PAGE; i++) {
-      const btnId = SceneRenderer.CB_ITEM_BUTTON_START + i;
-      const item = cb.items[offset + i];
-      if (item) {
-        const displayName = cookbookDisplayName(item.name);
-        console.log(`[SceneRenderer:CookBook] Button ${btnId} (pos ${btnId + 1}) label="${displayName}"`);
-        this.device.updateButton(btnId, { label: displayName, topLabel: "" });
-        this.device.setButtonSvg(btnId, page, "");
-        // LED-Feedback: grün = noch nicht auf der Liste, gelb = bereits drauf.
-        // Verglichen wird der API-Name (ohne „~"), wie er in der Liste steht.
-        const listName = cookbookApiName(item.name).trim().toLowerCase();
-        const inList = state.listItems.some((n) => n.trim().toLowerCase() === listName);
-        this.device.setButtonColor(btnId, page, inList ? "#ffff00" : "#00ff00");
-      } else {
-        this.device.clearButton(btnId, page);
-        this.device.ledOff(btnId, page);
-      }
-    }
-
-    // Paginierungs-Buttons (IDs 2-3)
-    const canPrev = state.itemPage > 0;
-    const canNext = state.itemPage < totalItemPages - 1;
-
-    this.device.updateButton(SceneRenderer.CB_PAGE_PREV, {
-      label: canPrev ? "<<" : "", topLabel: "",
-    });
-    this.device.setButtonSvg(SceneRenderer.CB_PAGE_PREV, page, "");
-    if (canPrev) {
-      this.device.setButtonColor(SceneRenderer.CB_PAGE_PREV, page, "#00ff00");
-    } else {
-      this.device.ledOff(SceneRenderer.CB_PAGE_PREV, page);
-    }
-
-    this.device.updateButton(SceneRenderer.CB_PAGE_NEXT, {
-      label: canNext ? ">>" : "", topLabel: "",
-    });
-    this.device.setButtonSvg(SceneRenderer.CB_PAGE_NEXT, page, "");
-    if (canNext) {
-      this.device.setButtonColor(SceneRenderer.CB_PAGE_NEXT, page, "#00ff00");
-    } else {
-      this.device.ledOff(SceneRenderer.CB_PAGE_NEXT, page);
     }
   }
 
@@ -257,12 +324,13 @@ export class SceneRenderer {
 
   /**
    * Rendert alle (nicht-Navigations-)Buttons einer Szene.
+   * @returns true, wenn ein Label oder Top-Label tatsächlich publiziert wurde
    */
   private renderButtons(
     scene: Scene,
     config: SceneRenderConfig,
     scope: Record<string, VarValue | undefined>,
-  ): void {
+  ): boolean {
     const navSet = new Set<number>();
     if (config.navButtons) {
       navSet.add(config.navButtons.prev);
@@ -271,6 +339,7 @@ export class SceneRenderer {
 
     const bindings = new Map(scene.buttons.map((b) => [b.buttonId, b]));
     const page = config.currentPage;
+    let sent = false;
 
     for (let id = 0; id < config.buttonCount; id++) {
       if (navSet.has(id)) continue; // Navigations-Buttons separat behandeln
@@ -281,10 +350,10 @@ export class SceneRenderer {
       const ov = config.overrides?.buttons.get(`${scene.id}:${id}`);
 
       if (binding || ov) {
-        this.device.updateButton(id, {
+        sent = this.device.updateButton(id, {
           label: interpolate(ov?.label ?? binding?.label ?? "", scope),
           topLabel: interpolate(ov?.toplabel ?? binding?.toplabel ?? "", scope),
-        });
+        }) || sent;
         // Nicht auflösbar/leer → "" publizieren, damit das Gerät garantiert
         // kein (altes) Icon anzeigt.
         this.device.setButtonSvg(
@@ -296,22 +365,38 @@ export class SceneRenderer {
         const ledExpr = ov?.ledColor ?? binding?.ledColor ?? "";
         const color = ledExpr ? this.evaluateLedColor(ledExpr, scope) : null;
         if (color) {
-          this.device.setButtonColor(id, page, color);
+          this.device.setButtonColor(id, page, color, "front");
         } else {
-          this.device.ledOff(id, page);
+          this.device.setLed(id, page, "front", { on: false });
+        }
+
+        // Rück-LED (Gerät: „wall“). wallColor im Befehl setzt sie; leer oder kein
+        // Hex schaltet sie aus. Ohne das Feld bleibt sie an, solange die Front-LED
+        // leuchtet — sonst aus, wie bisher bei ledOff.
+        if (ov && Object.prototype.hasOwnProperty.call(ov, "wallColor")) {
+          const wall = ov.wallColor ? this.evaluateLedColor(ov.wallColor, scope) : null;
+          if (wall) {
+            this.device.setButtonColor(id, page, wall, "wall");
+          } else {
+            this.device.setLed(id, page, "wall", { on: false });
+          }
+        } else if (!color) {
+          this.device.setLed(id, page, "wall", { on: false });
         }
       } else {
-        this.device.clearButton(id, page);
+        sent = this.device.clearButton(id, page) || sent;
         this.device.ledOff(id, page);
       }
     }
+    return sent;
   }
 
   /**
    * Rendert Navigations-Buttons (Prev/Next) inkl. LED-Feedback.
+   * @returns true, wenn ein Label tatsächlich publiziert wurde
    */
-  private renderNavigationButtons(config: SceneRenderConfig): void {
-    if (!config.navButtons) return;
+  private renderNavigationButtons(config: SceneRenderConfig): boolean {
+    if (!config.navButtons) return false;
 
     const { prev, next } = config.navButtons;
     const page = config.currentPage;
@@ -319,13 +404,14 @@ export class SceneRenderer {
     const canGoPrev = config.wrap || config.currentPage > 0;
     const canGoNext = config.wrap || config.currentPage < config.pageCount - 1;
 
-    this.device.updateButton(prev, { label: canGoPrev ? "◀" : "", topLabel: "" });
+    const prevSent = this.device.updateButton(prev, { label: canGoPrev ? "◀" : "", topLabel: "" });
     this.device.setButtonSvg(prev, page, "");
     this.device.setButtonColor(prev, page, canGoPrev ? config.navLedOn : config.navLedOff);
 
-    this.device.updateButton(next, { label: canGoNext ? "▶" : "", topLabel: "" });
+    const nextSent = this.device.updateButton(next, { label: canGoNext ? "▶" : "", topLabel: "" });
     this.device.setButtonSvg(next, page, "");
     this.device.setButtonColor(next, page, canGoNext ? config.navLedOn : config.navLedOff);
+    return prevSent || nextSent;
   }
 
   /**

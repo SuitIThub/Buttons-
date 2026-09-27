@@ -280,7 +280,7 @@ export interface Command {
    * Zu überschreibende Felder (Templates, interpolierbar). Nicht enthaltene
    * Felder bleiben unverändert; leerer String leert das Feld auf dem Gerät.
    * Display: label, value, unit, svg, color — Button: label, toplabel,
-   * svg, ledColor.
+   * svg, ledColor (Front-LED), wallColor (Rück-LED, Gerätetopic „wall“).
    */
   props?: Record<string, string>;
   /** true = alle Überschreibungen des Ziels entfernen. */
@@ -429,7 +429,7 @@ export function generateCookBookDisplay(): DisplayElement[] {
   // Sammellisteninhalt: zwei Spalten als JE EIN Element mit Zeilenumbrüchen
   // (bis zu CB_LIST_ROWS Zeilen). Spart ggü. 10 Einzel-Elementen viel
   // Config-Platz (festes /configsave-Limit im Gerät). Der Zeileninhalt wird zur
-  // Laufzeit mit „\n" zusammengesetzt (SceneRenderer.renderCookBookScene).
+  // Laufzeit mit „\n" zusammengesetzt (SceneRenderer.renderCookBookDisplay).
   const startY = 22;
   elements.push({
     id: "cb-list-l",

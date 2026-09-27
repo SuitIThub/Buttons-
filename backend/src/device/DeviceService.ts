@@ -166,16 +166,19 @@ export class DeviceService {
    * @param buttonId Button-ID (0-basiert)
    * @param update Werte zum Publizieren
    * @param retain MQTT retain flag (default: true)
+   * @returns true, wenn Label oder Top-Label tatsächlich gesendet wurde
    */
-  updateButton(buttonId: number, update: ButtonUpdate, retain = true): void {
+  updateButton(buttonId: number, update: ButtonUpdate, retain = true): boolean {
     const base = this.buttonTopic(buttonId);
+    let sent = false;
 
     if (update.label !== undefined) {
-      this.publish(`${base}/label/set`, update.label, retain);
+      sent = this.publish(`${base}/label/set`, update.label, retain) || sent;
     }
     if (update.topLabel !== undefined) {
-      this.publish(`${base}/toplabel/set`, update.topLabel, retain);
+      sent = this.publish(`${base}/toplabel/set`, update.topLabel, retain) || sent;
     }
+    return sent;
   }
 
   /**
@@ -202,9 +205,10 @@ export class DeviceService {
   /**
    * Löscht Button-Labels und das Icon der angegebenen Seite.
    */
-  clearButton(buttonId: number, pageIndex: number): void {
-    this.updateButton(buttonId, { label: "", topLabel: "" });
+  clearButton(buttonId: number, pageIndex: number): boolean {
+    const sent = this.updateButton(buttonId, { label: "", topLabel: "" });
     this.setButtonSvg(buttonId, pageIndex, "");
+    return sent;
   }
 
   // ==================== LED API ====================
@@ -247,8 +251,8 @@ export class DeviceService {
   /**
    * Setzt die (sichtbare) Front-LED eines Buttons auf eine Farbe und schaltet sie ein.
    */
-  setButtonColor(buttonId: number, pageIndex: number, color: string): void {
-    this.setLed(buttonId, pageIndex, "front", { color, brightness: FULL_BRIGHTNESS, on: true });
+  setButtonColor(buttonId: number, pageIndex: number, color: string, side: LedSide = "front"): void {
+    this.setLed(buttonId, pageIndex, side, { color, brightness: FULL_BRIGHTNESS, on: true });
   }
 
   /**
@@ -389,6 +393,18 @@ export class DeviceService {
   }
 
   /**
+   * Verwirft nur die gecachten Display-Item-Publishes.
+   * Nächster Display-Render sendet Label/Wert/Unit/SVG erneut, ohne die
+   * Button-Topics anzufassen (ein erneutes Button-Label würde den
+   * Firmware-Fehler unten wieder auslösen).
+   */
+  invalidateDisplayPublishCache(): void {
+    for (const topic of [...this.lastPublished.keys()]) {
+      if (topic.includes("/displayitem/")) this.lastPublished.delete(topic);
+    }
+  }
+
+  /**
    * Publiziert und loggt einheitlich.
    *
    * Retained State-Topics (Labels, LEDs, Display-Werte, SVG) werden
@@ -396,9 +412,9 @@ export class DeviceService {
    * Nicht-retained Steuerbefehle (page/set, brightness/set) werden immer
    * gesendet.
    */
-  private publish(topic: string, payload: string, retain: boolean): void {
+  private publish(topic: string, payload: string, retain: boolean): boolean {
     if (retain && this.lastPublished.get(topic) === payload) {
-      return; // Unveränderter Zustand → überspringen
+      return false; // Unveränderter Zustand → überspringen
     }
 
     console.log(`[DeviceService] 📤 ${topic} = "${payload}"${retain ? " (retain)" : ""}`);
@@ -409,6 +425,7 @@ export class DeviceService {
     if (retain && ok) {
       this.lastPublished.set(topic, payload);
     }
+    return ok;
   }
 
   /**

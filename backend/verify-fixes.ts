@@ -5,7 +5,7 @@
  */
 import { readFileSync } from "node:fs";
 import { DeviceService } from "./src/device/DeviceService.js";
-import { DeviceConfigBuilder } from "./src/device/DeviceConfigBuilder.js";
+import { deployFingerprint, DeviceConfigBuilder } from "./src/device/DeviceConfigBuilder.js";
 import type { BPConfig } from "./src/buttonplus/types.js";
 import type { Page, Scene } from "./src/model.js";
 import {
@@ -127,6 +127,48 @@ check("all buttons have front+wall LEDs", allHaveLeds, true);
 check("Config-Buttons ohne Phantom-SVG", out.config.mqttbuttons.every(b => (b.svg ?? "") === ""), true);
 check("display items across pages", out.config.mqttdisplays.map(d => d.displayitemid), ["0", "1"]);
 check("display item pages (1-based)", out.config.mqttdisplays.map(d => d.page), [1, 2]);
+
+console.log("\n=== deployFingerprint: nur Geräte-Layout fordert Deploy ===");
+{
+  const fpOf = (patch: (s: Scene[]) => void) => {
+    const next = structuredClone(scenes);
+    patch(next);
+    return deployFingerprint(DeviceConfigBuilder.build({ baseConfig: raw, pages, scenes: next, baseTopic: "buttonplus" }));
+  };
+  const withButton = fpOf((s) => {
+    s[0].buttons = [{ buttonId: 2, label: "Licht", ledColor: "#00ff00" }];
+  });
+  check("Button-Text und LED ändern den Fingerprint nicht", fpOf((s) => {
+    s[0].buttons = [{ buttonId: 2, label: "Anders", ledColor: "#ff0000" }];
+  }), withButton);
+  check("Event-Gruppe ändert den Fingerprint nicht", fpOf((s) => {
+    s[0].buttons = [{ buttonId: 2, label: "Licht", ledColor: "#00ff00" }];
+    s[0].groups = [{ id: "g", name: "G", commands: [] }];
+  }), withButton);
+  check("Display-Text ändert den Fingerprint nicht", fpOf((s) => {
+    s[0].buttons = [{ buttonId: 2, label: "Licht", ledColor: "#00ff00" }];
+    s[0].display[0].label = "Neu";
+    s[0].display[0].value = "x";
+  }), withButton);
+  check("Display-Position fordert Deploy", fpOf((s) => {
+    s[0].buttons = [{ buttonId: 2, label: "Licht", ledColor: "#00ff00" }];
+    s[0].display[0].x = 40;
+  }) !== withButton, true);
+  check("neuer Button fordert Deploy", fpOf((s) => {
+    s[0].buttons = [
+      { buttonId: 2, label: "Licht", ledColor: "#00ff00" },
+      { buttonId: 4, label: "Extra" },
+    ];
+  }) !== withButton, true);
+  check("Trigger an bestehendem Button fordert kein Deploy", fpOf((s) => {
+    s[0].buttons = [{ buttonId: 2, label: "Licht", ledColor: "#00ff00" }];
+    s[0].triggers = [{ id: "t", type: "button", buttonId: 2, press: "long_press", groupId: "andere", condition: "x" }];
+  }), withButton);
+  check("Trigger an neuem Button fordert Deploy", fpOf((s) => {
+    s[0].buttons = [{ buttonId: 2, label: "Licht", ledColor: "#00ff00" }];
+    s[0].triggers = [{ id: "t", type: "button", buttonId: 5, press: "click", groupId: "g" }];
+  }) !== withButton, true);
+}
 
 console.log("\n=== IconResolver: mdi -> SVG Tiny 1.2, raw SVG sanitize ===");
 const { resolveIcon } = await import("./src/device/IconResolver.js");

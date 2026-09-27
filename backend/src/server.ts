@@ -61,6 +61,7 @@ export async function buildServer(manager: DeviceManager): Promise<Server> {
       if (patch.mqttPassword === "" || patch.mqttPassword === undefined) delete patch.mqttPassword;
       await manager.store.updateSettings(patch);
       manager.reconnectMqtt();
+      manager.refreshUndeployed();
       res.json(maskSettings(manager.store.getSettings()));
     }),
   );
@@ -98,6 +99,7 @@ export async function buildServer(manager: DeviceManager): Promise<Server> {
     asyncHandler(async (_req, res) => {
       const cfg = await manager.pullConfig();
       manager.startRuntime();
+      manager.refreshUndeployed();
       res.json({ config: cfg });
     }),
   );
@@ -121,7 +123,7 @@ export async function buildServer(manager: DeviceManager): Promise<Server> {
       await manager.store.importData(req.body);
       manager.reconnectMqtt();
       manager.startRuntime();
-      manager.markUndeployed();
+      manager.refreshUndeployed();
       res.json({ ok: true });
     }),
   );
@@ -143,7 +145,7 @@ export async function buildServer(manager: DeviceManager): Promise<Server> {
     asyncHandler(async (req, res) => {
       const page = await manager.store.savePage(req.body);
       manager.startRuntime();
-      manager.markUndeployed();
+      manager.refreshUndeployed();
       res.json(page);
     }),
   );
@@ -153,7 +155,7 @@ export async function buildServer(manager: DeviceManager): Promise<Server> {
     asyncHandler(async (req, res) => {
       const page = await manager.store.savePage({ ...req.body, id: req.params.id });
       manager.startRuntime();
-      manager.markUndeployed();
+      manager.refreshUndeployed();
       res.json(page);
     }),
   );
@@ -163,7 +165,7 @@ export async function buildServer(manager: DeviceManager): Promise<Server> {
     asyncHandler(async (req, res) => {
       await manager.store.deletePage(req.params.id);
       manager.startRuntime();
-      manager.markUndeployed();
+      manager.refreshUndeployed();
       res.json({ ok: true });
     }),
   );
@@ -173,7 +175,7 @@ export async function buildServer(manager: DeviceManager): Promise<Server> {
     asyncHandler(async (req, res) => {
       const pages = await manager.store.reorderPages(req.body.orderedIds ?? []);
       manager.startRuntime();
-      manager.markUndeployed();
+      manager.refreshUndeployed();
       res.json(pages);
     }),
   );
@@ -190,15 +192,15 @@ export async function buildServer(manager: DeviceManager): Promise<Server> {
     }),
   );
 
-  // Speichern deployt NICHT mehr aufs Gerät – nur Modell sichern + Runtime
-  // aktualisieren (Werte/Logik live). Struktur (neue Elemente/Buttons) wird
-  // erst beim expliziten Deploy aufs Gerät geschrieben → markUndeployed().
+  // Speichern deployt nicht aufs Gerät – Modell sichern + Runtime aktualisieren.
+  // Deploy-Flag nur, wenn sich die Gerätekonfiguration wirklich ändert
+  // (Layout, Seiten, welche Buttons existieren). Event-Gruppen und Texte nicht.
   api.post(
     "/scenes",
     asyncHandler(async (req, res) => {
       const scene = await manager.store.saveScene(req.body);
       manager.startRuntime();
-      manager.markUndeployed();
+      manager.refreshUndeployed();
       res.json(scene);
     }),
   );
@@ -208,7 +210,7 @@ export async function buildServer(manager: DeviceManager): Promise<Server> {
     asyncHandler(async (req, res) => {
       const scene = await manager.store.saveScene({ ...req.body, id: req.params.id });
       manager.startRuntime();
-      manager.markUndeployed();
+      manager.refreshUndeployed();
       res.json(scene);
     }),
   );
@@ -218,7 +220,7 @@ export async function buildServer(manager: DeviceManager): Promise<Server> {
     asyncHandler(async (req, res) => {
       await manager.store.deleteScene(req.params.id);
       manager.startRuntime();
-      manager.markUndeployed();
+      manager.refreshUndeployed();
       res.json({ ok: true });
     }),
   );

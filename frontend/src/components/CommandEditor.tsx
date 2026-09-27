@@ -95,7 +95,8 @@ const BUTTON_FIELDS: PropField[] = [
   { key: "label", label: "Label", placeholder: "z. B. {on ? 'aus' : 'an'}" },
   { key: "toplabel", label: "Top-Label" },
   { key: "svg", label: "Icon", icon: true },
-  { key: "ledColor", label: "LED-Farbe", placeholder: "#00ff00 oder Ausdruck" },
+  { key: "ledColor", label: "Front-LED", placeholder: "#00ff00 oder Ausdruck" },
+  { key: "wallColor", label: "Rück-LED", placeholder: "#ff0000 oder Ausdruck, leer = aus" },
 ];
 
 function PropsFields({
@@ -119,7 +120,7 @@ function PropsFields({
         const active = f.key in props;
         return (
           <div key={f.key} className="flex items-center gap-2">
-            <label className="flex w-24 shrink-0 cursor-pointer items-center gap-1.5 text-xs text-slate-400">
+            <label className="flex w-28 shrink-0 cursor-pointer items-center gap-1.5 text-xs text-slate-400">
               <input type="checkbox" checked={active} onChange={(e) => toggle(f.key, e.target.checked)} className="accent-brand" />
               {f.label}
             </label>

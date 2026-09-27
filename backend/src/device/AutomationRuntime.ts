@@ -219,6 +219,7 @@ export class AutomationRuntime extends EventEmitter {
   }
 
   deactivate(): void {
+    this.renderer.cancelPendingDisplayRepair();
     this.clearTimers();
     for (const t of this.wallLedTimers.values()) clearTimeout(t);
     this.wallLedTimers.clear();

@@ -115,7 +115,7 @@ const scenes: Scene[] = [
       ] },
       { id: "g-override", name: "override", commands: [
         cmd({ type: "setDisplay", elementId: "e1", props: { value: "OVERRIDE" } }),
-        cmd({ type: "setButton", buttonId: 3, props: { label: "Neu" } }),
+        cmd({ type: "setButton", buttonId: 3, props: { label: "Neu", wallColor: "#0000ff" } }),
       ] },
       { id: "g-pause", name: "pause", commands: [
         cmd({ type: "setVar", variable: "p", expression: "1" }),
@@ -191,6 +191,13 @@ async function main() {
   runtime.runGroupById("s1", "g-override"); await flush();
   check("Display-Wert überschrieben", mqtt.last("displayitem/0/value/set"), "OVERRIDE");
   check("Button 3 (Pos 4) Label gesetzt", mqtt.last("button/4/label/set"), "Neu");
+  check("Rück-LED (wall) gesetzt", mqtt.last("button/4-1/led/wall/rgb/set"), "255");
+  check("Rück-LED eingeschaltet", mqtt.last("button/4-1/led/wall/on/set"), "true");
+  {
+    const btnAt = mqtt.pubs.findIndex((p) => p.topic.endsWith("button/4/label/set") && p.payload === "Neu");
+    const dispAt = mqtt.pubs.findLastIndex((p) => p.topic.endsWith("displayitem/0/value/set"));
+    check("Hauptdisplay wird nach Button-Text erneut geschrieben", dispAt > btnAt, true);
+  }
 
   console.log("\n=== pause (asynchrone Timeline) ===");
   runtime.runGroupById("s1", "g-pause");
