@@ -37,6 +37,12 @@ export interface TransitMessage {
   severity: Exclude<TransitSeverity, "none">;
 }
 
+/** Koordinate in Grad (HAFAS liefert Ganzzahl × 10⁶). */
+export interface TransitCoord {
+  lat: number;
+  lon: number;
+}
+
 export interface TransitDeparture {
   line: string;
   direction: string;
@@ -44,6 +50,26 @@ export interface TransitDeparture {
   /** Verspätung in Minuten; null = keine Echtzeit. */
   delay: number | null;
   cancelled: boolean;
+  /** Fahrt-ID (Eingabe für JourneyDetails). */
+  jid: string;
+  /**
+   * Linie inkl. Linienrichtung aus der jid, z. B. „gvh:02001: :H:j26“ (H/R =
+   * Hin/Rück). Alle Fahrten mit gleichem Schlüssel fahren an einer Haltestelle
+   * in dieselbe Richtung.
+   */
+  lineKey: string;
+  /** Steig-ID der Abfahrt (z. B. „de:03241:1391:6:1392“). */
+  stopLid: string;
+  stopCoord: TransitCoord | null;
+  /** Stadteinwärts/-auswärts (TransitDirections); fehlt = unbekannt. */
+  cityDir?: "in" | "out";
+}
+
+/** Halt eines Fahrtverlaufs (JourneyDetails). */
+export interface TransitJourneyStop {
+  lid: string;
+  name: string;
+  coord: TransitCoord | null;
 }
 
 export interface TransitStopEvent {
@@ -166,7 +192,7 @@ export function hafasDateTime(at: Date): { date: string; time: string } {
 // ==================== Rohdaten-Typen (nur genutzte Felder) ====================
 
 interface RawCommon {
-  locL?: { name?: string; lid?: string; extId?: string; type?: string }[];
+  locL?: { name?: string; lid?: string; extId?: string; type?: string; crd?: { x: number; y: number } }[];
   prodL?: { name?: string; nameS?: string; number?: string }[];
   remL?: { txtN?: string; type?: string; code?: string }[];
   himL?: { hid?: string; head?: string; text?: string; lead?: string; icoX?: number }[];
@@ -363,15 +389,44 @@ export function parseStationBoard(res: any): TransitDeparture[] {
     const s = j.stbStop ?? {};
     const planned = parseHafasTime(j.date, s.dTimeS);
     if (!planned) continue;
+    const loc = typeof s.locX === "number" ? common.locL?.[s.locX] : undefined;
     out.push({
       line: lineName(common, j.prodX),
       direction: shortStopName(stripHtml(j.dirTxt)),
       planned,
       delay: delayMinutes(planned, parseHafasTime(j.date, s.dTimeR)),
       cancelled: !!(s.dCncl || j.isCncl),
+      jid: String(j.jid ?? ""),
+      lineKey: decodeJidLine(j.jid) || lineName(common, j.prodX),
+      stopLid: loc?.lid ?? loc?.extId ?? "",
+      stopCoord: toCoord(loc?.crd),
     });
   }
   return out;
+}
+
+/** HAFAS-Koordinate (Ganzzahl × 10⁶, x = Länge) → Grad. */
+export function toCoord(crd: { x: number; y: number } | undefined): TransitCoord | null {
+  return crd && Number.isFinite(crd.x) && Number.isFinite(crd.y) ? { lat: crd.y / 1e6, lon: crd.x / 1e6 } : null;
+}
+
+/** Linienschlüssel aus der Base64-jid („line“, inkl. H/R). */
+export function decodeJidLine(jid: unknown): string {
+  try {
+    const obj = JSON.parse(Buffer.from(String(jid ?? ""), "base64").toString("utf8")) as { line?: string };
+    return typeof obj.line === "string" ? obj.line : "";
+  } catch {
+    return "";
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function parseJourneyStops(res: any): TransitJourneyStop[] {
+  const common: RawCommon = res?.common ?? {};
+  return ((res?.journey?.stopL ?? []) as RawStop[]).map((s) => {
+    const loc = typeof s.locX === "number" ? common.locL?.[s.locX] : undefined;
+    return { lid: loc?.lid ?? loc?.extId ?? "", name: loc?.name ?? "", coord: toCoord(loc?.crd) };
+  });
 }
 
 // ==================== Client ====================
@@ -466,6 +521,13 @@ export class GvhClient {
         .filter((l) => l.type === "S" && l.lid && l.name)
         .map((l) => ({ lid: l.lid!, name: l.name! }));
     });
+  }
+
+  /** Fahrtverlauf (alle Halte mit Koordinaten) einer Fahrt aus StationBoard. */
+  journeyStops(jid: string): Promise<TransitJourneyStop[]> {
+    return this.cached(`jny|${jid}`, 10 * 60_000, async () =>
+      parseJourneyStops(await this.request("JourneyDetails", { jid, getPolyline: false })),
+    );
   }
 
   /** Nächste Abfahrten einer Haltestelle (Echtzeit). */

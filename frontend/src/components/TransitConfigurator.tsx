@@ -52,7 +52,9 @@ export function TransitConfigurator({ config, onChange }: Props) {
       <Card title="Routen">
         <p className="mb-3 text-xs text-slate-500">
           Jede Route liegt auf einem Button. In der Übersicht zeigt der Button den Routennamen, seine LED
-          zeigt den Status der nächsten Verbindung (grün pünktlich, gelb verspätet/Hinweis, rot Störung).
+          zeigt den Status der nächsten Verbindung (grün pünktlich, orange verspätet ab 3 min, gelb Hinweis, rot Störung).
+          Die Übersicht teilt die Abfahrten in stadteinwärts und stadtauswärts auf (nicht bei Haltestellen
+          in der Innenstadt).
         </p>
         <div className="grid gap-3 md:grid-cols-2">
           {routes.map((r, slot) => {

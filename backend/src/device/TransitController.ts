@@ -13,8 +13,8 @@
 import { Scene, TransitConfig, TRANSIT_FIRST_BUTTON, TRANSIT_ROUTE_SLOTS, normalizeTransitConfig } from "../model.js";
 import { GvhClient, TransitConnection } from "../transit/GvhClient.js";
 import { DEVICE_SVG_MAX_BYTES, gvhTripUrl, qrSvg } from "../transit/qr.js";
+import { TransitDirections } from "../transit/directions.js";
 import {
-  TR_BODY_LINES,
   TR_BTN,
   TR_PAGE_SIZE,
   TransitRuntimeState,
@@ -44,11 +44,15 @@ export class TransitController {
   private routeStatusAt = new Map<string, number>();
   /** Erhöht sich bei enter/leave – verspätete Antworten werden verworfen. */
   private epoch = 0;
+  /** Stadteinwärts/-auswärts der Abfahrten (Tages-Cache je Linie+Richtung). */
+  private directions: TransitDirections;
 
   constructor(
     private client: GvhClient,
     private requestRender: () => void,
-  ) {}
+  ) {
+    this.directions = new TransitDirections((jid) => this.client.journeyStops(jid));
+  }
 
   // ==================== Lebenszyklus ====================
 
@@ -338,10 +342,13 @@ export class TransitController {
       const lid = cfg.station.lid;
       tasks.push(
         this.client
-          .departures(lid, TR_BODY_LINES + 2)
+          // Mehr als eine Seite laden: die Übersicht teilt nach Richtung auf
+          // und braucht je Richtung genug Abfahrten.
+          .departures(lid, 20)
+          .then((deps) => this.directions.annotate(deps.filter((d) => !isPast(d.planned, d.delay))))
           .then((deps) => {
             if (epoch !== this.epoch) return;
-            st.departures = deps.filter((d) => !isPast(d.planned, d.delay)).slice(0, TR_BODY_LINES);
+            st.departures = deps;
             st.error = null;
             st.updatedAt = new Date();
           })

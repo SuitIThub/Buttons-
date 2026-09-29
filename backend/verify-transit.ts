@@ -13,10 +13,12 @@ import {
   lineChain,
   warningLines,
   displaySafe,
+  overviewRows,
   TR_BTN,
 } from "./src/transit/transitView.js";
 import { gvhTripUrl, qrSvg } from "./src/transit/qr.js";
 import { TransitController, mergeConnections } from "./src/device/TransitController.js";
+import { TransitDirections, directionFromStops } from "./src/transit/directions.js";
 import { normalizeTransitConfig, type Scene, type TransitConfig } from "./src/model.js";
 import { compactForDevice, configPayloadBytes } from "./src/buttonplus/schema.js";
 
@@ -70,6 +72,9 @@ st.routeStatus[0] = "disruption";
 let v = buildTransitView(cfg, st);
 check("Übersicht: Titel = Haltestelle ohne Stadt", v.title, "Kröpcke");
 check("Übersicht: B2 = Routenname, rot", [v.buttons[2].label, v.buttons[2].led], ["Flughafen", "#ff0000"]);
+st.routeStatus[0] = "delay";
+check("Verspätung = orange (nicht gelb wie Hinweise)", buildTransitView(cfg, st).buttons[2].led, "#ff6000");
+st.routeStatus[0] = "disruption";
 check("Übersicht: leerer Slot B3 aus", v.buttons[3], { label: "", icon: "", led: null });
 check("Übersicht: 8 Zeilen (über der Gerätezeile)", v.body.split("\n").length, 8);
 check("Übersicht: Zeitspalte links", v.body.split("\n")[0], "19:41 +4");
@@ -94,6 +99,25 @@ st.selectedKey = c1.key;
 v = buildTransitView(cfg, st);
 check("Detail: max. 8 Zeilen", v.body.split("\n").length <= 8, true);
 check("Detail: B4 = Zurück", v.buttons[TR_BTN.select].label, "Zurück");
+
+console.log("Richtungen (stadteinwärts/-auswärts)");
+{
+  const stop = (lid: string, lat: number, lon: number) => ({ lid, name: lid, coord: { lat, lon } });
+  // Bothmerstraße (Süden) → Richtung Kröpcke (Norden) = einwärts.
+  const route = [stop("de:03241:1401:1:1", 52.33, 9.77), stop("de:03241:1391:6:1392", 52.3332, 9.7730), stop("de:03241:1381:1:1", 52.337, 9.768)];
+  check("nächster Halt näher am Zentrum → einwärts", directionFromStops(route, "de:03241:1391:6:1392"), "in");
+  check("umgekehrte Fahrt → auswärts", directionFromStops([...route].reverse(), "de:03241:1391:1:1393"), "out");
+  check("Endhalt → unbestimmt", directionFromStops(route.slice(0, 2), "de:03241:1391:6:1392"), null);
+  check("Kröpcke gilt als Zentrum", TransitDirections.isCentral({ lat: 52.3745, lon: 9.7386 }), true);
+  check("Bothmerstraße nicht Zentrum", TransitDirections.isCentral({ lat: 52.3332, lon: 9.773 }), false);
+  const dirDeps = deps.map((d, i) => ({ ...d, cityDir: (i % 3 === 0 ? "out" : "in") as "in" | "out" }));
+  const rows = overviewRows(dirDeps);
+  check("Blöcke: 2 Überschriften + 2×3 Abfahrten", [rows.length, rows[0].heading, rows[4].heading], [8, "Stadteinwärts", "Stadtauswärts"]);
+  check("Blöcke sortenrein", rows.filter((r) => r.dep).map((r) => r.dep!.cityDir).join(""), "inininoutoutout");
+  const onlyIn = overviewRows(dirDeps.filter((d) => d.cityDir === "in"));
+  check("leerer Block zeigt Hinweis", onlyIn[onlyIn.length - 1].heading, "  keine Abfahrten");
+  check("ohne Richtungen gemischte Liste", overviewRows(deps).every((r) => r.dep), true);
+}
 
 console.log("Blättern");
 const merged = mergeConnections(trip.connections.slice(0, 2), trip.connections.slice(1));
@@ -125,6 +149,9 @@ console.log("Zustandsmaschine (TransitController)");
       return o.ctxScr === "later"
         ? { connections: later, ctxLater: null, ctxEarlier: null }
         : { connections: base, ctxLater: "later", ctxEarlier: null };
+    },
+    async journeyStops() {
+      return [];
     },
     async departures() {
       return shiftDates(deps, Date.now() + 60_000 - deps[0].planned.getTime());

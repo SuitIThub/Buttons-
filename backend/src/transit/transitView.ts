@@ -40,6 +40,9 @@ const G = { cursor: ">", arrow: "->", chain: " > ", dot: "|" };
 
 export const TR_LED = {
   ok: "#00ff00",
+  /** Verspätung (ohne Meldung) – bewusst anders als „Hinweis“ (gelb), damit
+   *  eine gelbe Route-LED immer auch eine Meldung auf B6 bedeutet. */
+  delay: "#ff6000",
   warn: "#ffff00",
   bad: "#ff0000",
   action: "#00ff00",
@@ -249,6 +252,7 @@ function statusLed(s: RouteStatus): string | null {
     case "ok":
       return TR_LED.ok;
     case "delay":
+      return TR_LED.delay;
     case "warning":
       return TR_LED.warn;
     case "disruption":
@@ -370,23 +374,34 @@ function overviewView(cfg: TransitConfig, st: TransitRuntimeState): TransitView 
     };
   }
 
-  const deps = (st.departures ?? []).slice(0, TR_BODY_LINES);
+  const all = st.departures ?? [];
   const title = clip(shortStopName(cfg.station.name), 32);
-  if (!deps.length) {
+  if (!all.length) {
     const body = st.loading ? "Lade Abfahrten..." : st.error ? "" : "Keine Abfahrten.";
     return { title, body, col2: "", footer: footerStamp(st), qr: "", buttons };
   }
 
   // Zwei Spalten (eigene Display-Elemente): links Zeit + Verspätung, rechts
-  // Linie + Ziel. Die Linie wird grob auf die längste Liniennummer aufgefüllt
-  // (Proportionalschrift: eine Ziffer ≈ 2 Leerzeichen breit).
-  const maxLine = Math.max(...deps.map((d) => d.line.length));
-  const times = deps.map((d) => (d.cancelled ? hhmm(d.planned) : timeWithDelay(d.planned, d.delay)));
-  const lines = deps.map((d) => {
+  // Linie + Ziel. Mit bekannter Richtung zwei Blöcke „Stadteinwärts“ /
+  // „Stadtauswärts“ mit je einer Überschrift, sonst eine gemischte Liste.
+  const rows = overviewRows(all);
+  const maxLine = Math.max(1, ...rows.map((r) => r.dep?.line.length ?? 0));
+  const times: string[] = [];
+  const lines: string[] = [];
+  for (const r of rows) {
+    if (!r.dep) {
+      times.push(r.heading ?? "");
+      lines.push("");
+      continue;
+    }
+    const d = r.dep;
+    times.push(d.cancelled ? hhmm(d.planned) : timeWithDelay(d.planned, d.delay));
+    // Linie grob auf die längste Nummer auffüllen (Proportionalschrift:
+    // eine Ziffer ≈ 2 Leerzeichen breit).
     const pad = " ".repeat(Math.round((maxLine - d.line.length) * 2) + 2);
     const dest = clip(d.direction, 26);
-    return `${d.line}${pad}${d.cancelled ? `${dest} - fällt aus` : dest}`;
-  });
+    lines.push(`${d.line}${pad}${d.cancelled ? `${dest} - fällt aus` : dest}`);
+  }
 
   return {
     title,
@@ -396,6 +411,31 @@ function overviewView(cfg: TransitConfig, st: TransitRuntimeState): TransitView 
     qr: "",
     buttons,
   };
+}
+
+/** Abfahrten je Richtungsblock (Überschrift + N Zeilen, zwei Blöcke = TR_BODY_LINES). */
+export const TR_BLOCK_SIZE = TR_BODY_LINES / 2 - 1;
+
+interface OverviewRow {
+  heading?: string;
+  dep?: TransitDeparture;
+}
+
+/**
+ * Zeilen der Übersicht. Sind Richtungen bekannt: Block „Stadteinwärts“, dann
+ * „Stadtauswärts“ (je TR_BLOCK_SIZE, Abfahrten ohne bekannte Richtung fallen
+ * weg). Sonst die ersten TR_BODY_LINES Abfahrten gemischt.
+ */
+export function overviewRows(deps: TransitDeparture[]): OverviewRow[] {
+  if (!deps.some((d) => d.cityDir)) return deps.slice(0, TR_BODY_LINES).map((dep) => ({ dep }));
+  const rows: OverviewRow[] = [];
+  for (const [dir, heading] of [["in", "Stadteinwärts"], ["out", "Stadtauswärts"]] as const) {
+    rows.push({ heading });
+    const block = deps.filter((d) => d.cityDir === dir).slice(0, TR_BLOCK_SIZE);
+    if (!block.length) rows.push({ heading: "  keine Abfahrten" });
+    for (const dep of block) rows.push({ dep });
+  }
+  return rows;
 }
 
 function homeButton(): TransitButtonView {
