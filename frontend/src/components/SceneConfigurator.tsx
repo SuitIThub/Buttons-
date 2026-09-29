@@ -5,6 +5,7 @@ import {
   ButtonBinding,
   CookBookConfig,
   DisplayElement,
+  TransitConfig,
   EventGroup,
   RuntimeState,
   Scene,
@@ -18,6 +19,7 @@ import { ButtonsConfig } from "./ButtonsConfig";
 import { EventGroupsEditor } from "./EventGroupsEditor";
 import { TriggerEditor } from "./TriggerEditor";
 import { CookBookConfigurator } from "./CookBookConfigurator";
+import { TransitConfigurator } from "./TransitConfigurator";
 import { SceneContext } from "./CommandEditor";
 import { ConnectorType, mapButtons } from "../lib/helpers";
 
@@ -102,6 +104,9 @@ export function SceneConfigurator({
       if (scene.category === "cookbook") {
         payload.cookbook = scene.cookbook;
       }
+      if (scene.category === "transit") {
+        payload.transit = scene.transit;
+      }
       const saved = await api.updateScene(scene.id, payload);
       setScene(saved);
       setDirty(false);
@@ -126,7 +131,8 @@ export function SceneConfigurator({
           onChange={(e) => patch({ name: e.target.value })}
         />
         <span className="rounded-full bg-slate-500/20 px-2 py-0.5 text-xs text-slate-300">
-          Kategorie: {scene.category === "cookbook" ? "CookBook" : "Custom"}
+          Kategorie:{" "}
+          {scene.category === "cookbook" ? "CookBook" : scene.category === "transit" ? "Fahrplan" : "Custom"}
         </span>
         <div className="ml-auto flex items-center gap-2">
           {dirty && <span className="text-xs text-amber-300">Ungespeichert</span>}
@@ -148,6 +154,11 @@ export function SceneConfigurator({
             Ein Deploy ist nur nötig, wenn die Szene neu einer Seite zugewiesen wird.
           </p>
         </>
+      ) : scene.category === "transit" ? (
+        <TransitConfigurator
+          config={scene.transit ?? { station: null, routes: [] }}
+          onChange={(transit: TransitConfig) => patch({ transit })}
+        />
       ) : (
         <>
           <div className="flex gap-1 rounded-xl border border-white/10 bg-white/[0.02] p-1">

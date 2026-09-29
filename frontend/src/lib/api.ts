@@ -7,6 +7,7 @@ import {
   SensorInfo,
   Settings,
   StatusResponse,
+  TransitStop,
   VariableDef,
 } from "./types";
 
@@ -79,6 +80,9 @@ export const api = {
       `/api/variables/${encodeURIComponent(name)}/rename`,
       { method: "POST", body: JSON.stringify({ newName }) },
     ),
+
+  searchStops: (q: string) =>
+    req<TransitStop[]>(`/api/transit/stops?q=${encodeURIComponent(q)}`),
 
   searchIcons: (q: string, limit = 120) =>
     req<{ icons: { name: string; path: string }[]; total: number }>(

@@ -40,6 +40,52 @@ export function toCanonical(raw: unknown): BPConfig {
   };
 }
 
+/**
+ * Feste Obergrenze des Geräts für den `/configsave`-Body. Darüber antwortet die
+ * Firmware mit HTTP 413 und verwirft die Konfiguration (verifiziert 2026-09-29,
+ * Firmware 3.1.8-V2: 16.115 B gingen durch, 20.985 B → 413).
+ */
+export const CONFIGSAVE_LIMIT_BYTES = 16 * 1024;
+
+/**
+ * Entfernt leere Felder aus Buttons und Display-Items, die das Gerät nicht
+ * braucht: `payload: ""` in Topics sowie leere `label`/`toplabel`/`svg`
+ * (Buttons) bzw. `label`/`unit` (Display-Items). Texte/Icons kommen ohnehin
+ * zur Laufzeit per MQTT. Liefert eine Kopie – die Eingabe bleibt unverändert.
+ *
+ * Ausnahme `toplabel`: Fehlt das Feld, setzt die Firmware einen Werkstext
+ * (Position 8: „Button+ Like“, verifiziert 2026-09-29). Ohne Toplabel-Topic
+ * lässt sich der zur Laufzeit nicht mehr löschen – dort bleibt `toplabel: ""`.
+ */
+export function compactForDevice(raw: Raw): Raw {
+  const out = structuredClone(raw);
+  const strip = (items: unknown, emptyKeys: string[]) => {
+    if (!isArr(items)) return;
+    for (const item of items as Raw[]) {
+      for (const k of emptyKeys) if (item[k] === "") delete item[k];
+      if (isArr(item.topics)) {
+        for (const t of item.topics as Raw[]) if (t.payload === "") delete t.payload;
+      }
+    }
+  };
+  const buttons = out.buttons ?? out.mqttbuttons;
+  strip(buttons, ["label", "svg"]);
+  if (isArr(buttons)) {
+    for (const b of buttons as Raw[]) {
+      const hasTopLabelTopic =
+        isArr(b.topics) && (b.topics as Raw[]).some((t) => String(t.topic ?? "").endsWith("/toplabel/set"));
+      if (b.toplabel === "" && hasTopLabelTopic) delete b.toplabel;
+    }
+  }
+  strip(out.displayitems ?? out.mqttdisplays, ["label", "unit"]);
+  return out;
+}
+
+/** Größe des `/configsave`-Bodys in Bytes (UTF-8, wie er gesendet wird). */
+export function configPayloadBytes(raw: Raw): number {
+  return Buffer.byteLength(JSON.stringify(raw), "utf8");
+}
+
 /** Interne Config in das vom Gerät erwartete JSON (passender Dialekt) übersetzen. */
 export function toDevice(cfg: BPConfig, dialect: ConfigDialect): Raw {
   if (dialect === "legacy") {

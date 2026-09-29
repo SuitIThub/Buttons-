@@ -270,7 +270,31 @@ export interface CookBookConfig {
   items: CookBookItem[];
 }
 
-export type SceneCategory = "custom" | "cookbook";
+// ---- Fahrplan-Szenentyp (GVH) ------------------------------------------
+
+export interface TransitStop {
+  lid: string;
+  name: string;
+}
+
+export interface TransitRoute {
+  id: string;
+  name: string;
+  from: TransitStop;
+  to: TransitStop;
+  /** Fußweg bis zur Starthaltestelle (min). */
+  walkMinutes?: number;
+}
+
+/** Route-Slots = Buttons B2..B7 (Geräte-Positionen 3..8). */
+export const TRANSIT_ROUTE_SLOTS = 6;
+
+export interface TransitConfig {
+  station: TransitStop | null;
+  routes: (TransitRoute | null)[];
+}
+
+export type SceneCategory = "custom" | "cookbook" | "transit";
 
 export interface Scene {
   id: string;
@@ -281,6 +305,7 @@ export interface Scene {
   groups: EventGroup[];
   triggers: Trigger[];
   cookbook?: CookBookConfig;
+  transit?: TransitConfig;
   createdAt: number;
   updatedAt: number;
 }

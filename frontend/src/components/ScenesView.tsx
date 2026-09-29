@@ -5,6 +5,7 @@ import { Badge, Button, Card, Input } from "./ui";
 const CATEGORY_LABELS: Record<Scene["category"], string> = {
   custom: "Custom",
   cookbook: "CookBook",
+  transit: "Fahrplan",
 };
 
 interface Props {
@@ -44,6 +45,17 @@ export function ScenesView({ scenes, pages, onConfigure, refreshScenes, onToast 
       onConfigure(scene.id);
     });
 
+  const createTransitScene = () =>
+    guard(async () => {
+      const scene = await api.createScene({
+        name: "Fahrplan",
+        category: "transit",
+        transit: { station: null, routes: [] },
+      });
+      await refreshScenes();
+      onConfigure(scene.id);
+    });
+
   const renameScene = (s: Scene, name: string) =>
     guard(async () => {
       await api.updateScene(s.id, { name });
@@ -72,6 +84,9 @@ export function ScenesView({ scenes, pages, onConfigure, refreshScenes, onToast 
           </Button>
           <Button variant="subtle" onClick={createCookBookScene}>
             + CookBook
+          </Button>
+          <Button variant="subtle" onClick={createTransitScene}>
+            + Fahrplan
           </Button>
         </div>
       }

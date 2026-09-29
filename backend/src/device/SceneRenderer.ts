@@ -15,6 +15,7 @@ import { DeviceService } from "./DeviceService.js";
 import { resolveIcon } from "./IconResolver.js";
 import { Scene, normalizeDisplayElement, CookBookConfig, cookbookDisplayName, cookbookApiName, applyDisplayLineBreaks } from "../model.js";
 import { interpolate, formatDisplayValue, evaluate, toStr } from "../engine/expr.js";
+import { TransitView } from "../transit/transitView.js";
 import { VarValue } from "../model.js";
 
 /**
@@ -88,7 +89,12 @@ export class SceneRenderer {
   /**
    * Rendert eine komplette Szene auf das Gerät.
    */
-  renderScene(scene: Scene, config: SceneRenderConfig, cookbookState?: CookBookRuntimeState): void {
+  renderScene(
+    scene: Scene,
+    config: SceneRenderConfig,
+    cookbookState?: CookBookRuntimeState,
+    transitView?: TransitView,
+  ): void {
     console.log(`[SceneRenderer] Rendering scene "${scene.name}" on page ${config.currentPage}`);
 
     // Firmware-Fehler (V2/V3): Ändert oder leert man ein Button-Label, schreibt das
@@ -98,9 +104,12 @@ export class SceneRenderer {
     // überspringt unveränderte Display-Topics, darum den Display-Cache verwerfen,
     // sobald wirklich ein Button-Text rausging.
     const cookbook = scene.category === "cookbook" && scene.cookbook;
+    const transit = scene.category === "transit" ? transitView : undefined;
     let buttonTextSent = cookbook
       ? this.renderCookBookButtons(scene, config, cookbookState)
-      : this.renderButtons(scene, config, this.getVariableScope());
+      : transit
+        ? this.renderTransitButtons(config, transit)
+        : this.renderButtons(scene, config, this.getVariableScope());
 
     if (config.navButtons) {
       buttonTextSent = this.renderNavigationButtons(config) || buttonTextSent;
@@ -109,10 +118,11 @@ export class SceneRenderer {
     if (buttonTextSent) this.device.invalidateDisplayPublishCache();
 
     if (cookbook) this.renderCookBookDisplay(scene, config, cookbookState);
+    else if (transit) this.renderTransitDisplay(scene, config, transit);
     else this.renderDisplayItems(scene, config);
 
-    if (buttonTextSent) this.scheduleDisplayRepair(scene, config, cookbookState);
-    else if (this.displayRepairTimer) this.pendingDisplayRepair = { scene, config, cookbookState };
+    if (buttonTextSent) this.scheduleDisplayRepair(scene, config, cookbookState, transit);
+    else if (this.displayRepairTimer) this.pendingDisplayRepair = { scene, config, cookbookState, transitView: transit };
 
     console.log(`[SceneRenderer] Rendering complete`);
   }
@@ -131,6 +141,7 @@ export class SceneRenderer {
     scene: Scene;
     config: SceneRenderConfig;
     cookbookState?: CookBookRuntimeState;
+    transitView?: TransitView;
   } | null = null;
 
   /** Zweites Setzen des Hauptdisplays, nachdem die Firmware den Leak angewendet hat. */
@@ -138,8 +149,9 @@ export class SceneRenderer {
     scene: Scene,
     config: SceneRenderConfig,
     cookbookState?: CookBookRuntimeState,
+    transitView?: TransitView,
   ): void {
-    this.pendingDisplayRepair = { scene, config, cookbookState };
+    this.pendingDisplayRepair = { scene, config, cookbookState, transitView };
     if (this.displayRepairTimer) clearTimeout(this.displayRepairTimer);
     const timer = setTimeout(() => {
       this.displayRepairTimer = null;
@@ -149,6 +161,8 @@ export class SceneRenderer {
       this.device.invalidateDisplayPublishCache();
       if (job.scene.category === "cookbook" && job.scene.cookbook) {
         this.renderCookBookDisplay(job.scene, job.config, job.cookbookState);
+      } else if (job.transitView) {
+        this.renderTransitDisplay(job.scene, job.config, job.transitView);
       } else {
         this.renderDisplayItems(job.scene, job.config);
       }
@@ -276,6 +290,60 @@ export class SceneRenderer {
         this.device.updateDisplay(mapping.displayItemId, {
           label: "", value, unit: "", svg: "",
         });
+      }
+    }
+  }
+
+  // ==================== FAHRPLAN ====================
+
+  /**
+   * Rendert die Buttons B2..B7 einer Fahrplan-Szene (Belegung aus der View).
+   * @returns true, wenn ein Label tatsächlich publiziert wurde
+   */
+  private renderTransitButtons(config: SceneRenderConfig, view: TransitView): boolean {
+    const page = config.currentPage;
+    const nav = config.navButtons;
+    let sent = false;
+    for (let id = 0; id < config.buttonCount; id++) {
+      if (nav && (id === nav.prev || id === nav.next)) continue;
+      const b = view.buttons[id];
+      if (!b || (!b.label && !b.icon && !b.led)) {
+        sent = this.device.clearButton(id, page) || sent;
+        this.device.ledOff(id, page);
+        continue;
+      }
+      sent = this.device.updateButton(id, { label: b.label, topLabel: "" }) || sent;
+      this.device.setButtonSvg(id, page, resolveIcon(b.icon) ?? "");
+      if (b.led) {
+        this.device.setButtonColor(id, page, b.led, "front");
+        this.device.setLed(id, page, "wall", { on: false });
+      } else {
+        this.device.ledOff(id, page);
+      }
+    }
+    return sent;
+  }
+
+  /** Hauptdisplay einer Fahrplan-Szene (tr-title/-body/-footer/-qr). */
+  private renderTransitDisplay(scene: Scene, config: SceneRenderConfig, view: TransitView): void {
+    const mappings = config.displayMappings.filter(
+      (m) => m.sceneId === scene.id && m.pageIndex === config.currentPage,
+    );
+    for (const mapping of mappings) {
+      const blank = { label: "", value: "", unit: "", svg: "" };
+      switch (mapping.elementId) {
+        case "tr-title":
+          this.device.updateDisplay(mapping.displayItemId, { ...blank, label: view.title });
+          break;
+        case "tr-body":
+          this.device.updateDisplay(mapping.displayItemId, { ...blank, value: view.body });
+          break;
+        case "tr-footer":
+          this.device.updateDisplay(mapping.displayItemId, { ...blank, value: view.footer });
+          break;
+        case "tr-col2":
+          this.device.updateDisplay(mapping.displayItemId, { ...blank, value: view.col2 ?? "", svg: view.qr });
+          break;
       }
     }
   }

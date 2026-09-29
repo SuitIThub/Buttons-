@@ -391,7 +391,47 @@ export interface CookBookConfig {
   items: CookBookItem[];
 }
 
-export type SceneCategory = "custom" | "cookbook";
+// ---- Fahrplan-Szenentyp (GVH/HAFAS) ------------------------------------
+
+/** Haltestelle aus der HAFAS-Suche (lid = DHID, z. B. „de:03241:11“). */
+export interface TransitStop {
+  lid: string;
+  name: string;
+}
+
+/** Eine benannte Route (Start → Ziel) auf einem der 6 Route-Buttons. */
+export interface TransitRoute {
+  id: string;
+  /** Anzeigename auf dem Button. */
+  name: string;
+  from: TransitStop;
+  to: TransitStop;
+  /** Fußweg bis zur Starthaltestelle in Minuten – frühere Verbindungen fallen weg. */
+  walkMinutes?: number;
+}
+
+/** Anzahl Route-Slots = Buttons B2..B7 (0-basierte IDs 2..7). */
+export const TRANSIT_ROUTE_SLOTS = 6;
+/** 0-basierte ID des ersten Route-Buttons. */
+export const TRANSIT_FIRST_BUTTON = 2;
+
+export interface TransitConfig {
+  /** Haltestelle der Abfahrtsübersicht. */
+  station: TransitStop | null;
+  /** Genau TRANSIT_ROUTE_SLOTS Einträge; null = Slot leer. */
+  routes: (TransitRoute | null)[];
+}
+
+/** Bringt eine (evtl. unvollständige) Transit-Konfig auf die feste Slot-Anzahl. */
+export function normalizeTransitConfig(cfg: Partial<TransitConfig> | undefined): TransitConfig {
+  const routes = Array.from({ length: TRANSIT_ROUTE_SLOTS }, (_, i) => {
+    const r = cfg?.routes?.[i];
+    return r && r.from?.lid && r.to?.lid ? r : null;
+  });
+  return { station: cfg?.station?.lid ? cfg.station : null, routes };
+}
+
+export type SceneCategory = "custom" | "cookbook" | "transit";
 
 export interface Scene {
   id: string;
@@ -405,6 +445,8 @@ export interface Scene {
   triggers: Trigger[];
   /** CookBook-spezifische Konfiguration (nur wenn category === "cookbook"). */
   cookbook?: CookBookConfig;
+  /** Fahrplan-spezifische Konfiguration (nur wenn category === "transit"). */
+  transit?: TransitConfig;
   createdAt: number;
   updatedAt: number;
 }
@@ -453,6 +495,51 @@ export function generateCookBookDisplay(): DisplayElement[] {
   });
 
   return elements;
+}
+
+// ---- Fahrplan Display-Generator ----------------------------------------
+
+/**
+ * Erzeugt die festen Display-Elemente einer Fahrplan-Szene. Alle Ansichten
+ * (Übersicht, Verbindungsliste, Detail, Meldungen, QR) teilen sich dieses
+ * Layout – das Layout liegt nach dem Deploy fest im Gerät, nur Texte/SVG
+ * wechseln zur Laufzeit (SceneRenderer.renderTransitDisplay).
+ */
+export function generateTransitDisplay(): DisplayElement[] {
+  return [
+    // Kopfzeile: Haltestelle bzw. „Start → Ziel“.
+    {
+      id: "tr-title",
+      x: 3, y: 2, width: 94,
+      fontSize: 3, align: 0, color: "#97bf0d",
+      label: "", value: "", boxtype: 1,
+    },
+    // Inhalt: EIN mehrzeiliges Element, Zeilen zur Laufzeit per „\n“ gestapelt
+    // (max. TR_BODY_LINES, endet oberhalb der Fußzeile). In der Übersicht die
+    // linke Spalte (Zeit + Verspätung).
+    {
+      id: "tr-body",
+      x: 3, y: 14, width: 94,
+      fontSize: 1, align: 0, color: "#dddddd",
+      label: "", value: "", boxtype: 1,
+    },
+    // Zweite Spalte der Übersicht (Linie + Ziel); trägt auch ein evtl. SVG.
+    // Proportionalschrift → Spalten nur über eigene Elemente sauber ausrichtbar.
+    {
+      id: "tr-col2",
+      x: 27, y: 14, width: 70,
+      fontSize: 1, align: 0, color: "#dddddd",
+      label: "", value: "", boxtype: 1,
+    },
+    // Statuszeile: Seite, Stand, Fehler. Liegt ÜBER der festen Gerätezeile
+    // (IP, WLAN, Speicher) am unteren Displayrand.
+    {
+      id: "tr-footer",
+      x: 3, y: 83, width: 94,
+      fontSize: 0, align: 0, color: "#888888",
+      label: "", value: "", boxtype: 1,
+    },
+  ];
 }
 
 /**

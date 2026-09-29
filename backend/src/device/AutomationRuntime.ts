@@ -14,6 +14,8 @@ import { EventEmitter } from "node:events";
 import { DeviceService } from "./DeviceService.js";
 import { SceneRenderer, SceneRenderConfig, SceneOverrides, emptyOverrides, CookBookRuntimeState } from "./SceneRenderer.js";
 import { DeviceConfigOutput } from "./DeviceConfigBuilder.js";
+import { TransitController } from "./TransitController.js";
+import { gvh } from "../transit/GvhClient.js";
 import { VariableState, coerce } from "../engine/variables.js";
 import { XMLParser } from "fast-xml-parser";
 import { flattenJson } from "../engine/flatten.js";
@@ -113,6 +115,9 @@ export class AutomationRuntime extends EventEmitter {
   private cookbookStates = new Map<string, CookBookRuntimeState>();
   /** Läuft gerade eine Löschung? Verhindert Doppel-DELETE bei Long-Press-Repeat. */
   private cookbookRemoving = new Set<string>();
+  // ---- Fahrplan-Szenen ----
+  private transit = new TransitController(gvh, () => this.render());
+
   /** Auto-Off-Timer der Wall-LED (rote Long-Press-Anzeige) je Button. */
   private wallLedTimers = new Map<number, ReturnType<typeof setTimeout>>();
 
@@ -212,6 +217,7 @@ export class AutomationRuntime extends EventEmitter {
     if (scene) {
       this.fireTriggers(scene, "page_enter");
       if (scene.category === "cookbook") void this.fetchCookBookList(scene);
+      if (scene.category === "transit") this.transit.enter(scene);
     }
 
     this.render();
@@ -228,6 +234,7 @@ export class AutomationRuntime extends EventEmitter {
     this.config = null;
     this.renderConfig = null;
     this.cookbookStates.clear();
+    this.transit.stop();
     this.emit("deactivated");
   }
 
@@ -270,7 +277,8 @@ export class AutomationRuntime extends EventEmitter {
     const scene = this.currentScene();
     if (!scene) return;
     const cbState = scene.category === "cookbook" ? this.getCookBookState(scene.id) : undefined;
-    this.renderer.renderScene(scene, this.renderConfig, cbState);
+    const transitView = scene.category === "transit" ? this.transit.view(scene) : undefined;
+    this.renderer.renderScene(scene, this.renderConfig, cbState, transitView);
     this.emit("state", this.getState());
   }
 
@@ -383,6 +391,12 @@ export class AutomationRuntime extends EventEmitter {
     // CookBook-Szenen: eigene Button-Logik (Klick = hinzufügen, Long = entfernen).
     if (scene.category === "cookbook" && scene.cookbook) {
       this.handleCookBookButton(scene, buttonId, press);
+      return;
+    }
+
+    // Fahrplan-Szenen: Ansichts-Zustandsmaschine (Routen, Liste, Detail, …).
+    if (scene.category === "transit") {
+      this.transit.handleButton(scene, buttonId, press);
       return;
     }
 
@@ -1168,6 +1182,7 @@ export class AutomationRuntime extends EventEmitter {
 
     const oldScene = this.currentScene();
     if (oldScene) this.fireTriggers(oldScene, "page_leave");
+    if (oldScene?.category === "transit") this.transit.leave();
 
     this.currentPage = idx;
     if (this.renderConfig) this.renderConfig.currentPage = idx;
@@ -1178,6 +1193,7 @@ export class AutomationRuntime extends EventEmitter {
     if (newScene) {
       this.fireTriggers(newScene, "page_enter");
       if (newScene.category === "cookbook") void this.fetchCookBookList(newScene);
+      if (newScene.category === "transit") this.transit.enter(newScene);
     }
 
     // Nach Seitenwechsel Idle-Timer neu takten (auf Hauptseite: aus; sonst neu).

@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { AppSettings } from "./buttonplus/types.js";
-import { DisplayElement, NavSettings, LedDimSettings, Page, Scene, VariableDef, VarValue, DEFAULT_NAV, DEFAULT_LED_DIM, normalizeSceneDisplay, collectVariableRefsFromScene, defaultVarValue, generateCookBookDisplay } from "./model.js";
+import { DisplayElement, NavSettings, LedDimSettings, Page, Scene, VariableDef, VarValue, DEFAULT_NAV, DEFAULT_LED_DIM, normalizeSceneDisplay, collectVariableRefsFromScene, defaultVarValue, generateCookBookDisplay, generateTransitDisplay, normalizeTransitConfig } from "./model.js";
 import { normalizeLedDim } from "./ledDim.js";
 import { loadEnvSettings, mergeSettings, settingsHealedFromEnv, DATA_DIR } from "./config.js";
 
@@ -310,7 +310,11 @@ export class Store {
     // CookBook-Display ist vollständig generiert (kein User-Edit) – immer frisch
     // erzeugen, damit Änderungen am Generator (Farben, boxtype) sofort greifen.
     const display =
-      s.category === "cookbook" ? generateCookBookDisplay() : normalizeSceneDisplay(s.display ?? []);
+      s.category === "cookbook"
+        ? generateCookBookDisplay()
+        : s.category === "transit"
+          ? generateTransitDisplay()
+          : normalizeSceneDisplay(s.display ?? []);
     return {
       ...s,
       groups: s.groups ?? [],
@@ -318,6 +322,7 @@ export class Store {
       buttons: s.buttons ?? [],
       display,
       cookbook: s.cookbook,
+      transit: s.category === "transit" ? normalizeTransitConfig(s.transit) : s.transit,
     };
   }
 
@@ -337,6 +342,7 @@ export class Store {
     // CookBook-Szenen: Display-Elemente automatisch generieren.
     const resolveDisplay = (fallback: DisplayElement[]): DisplayElement[] => {
       if (category === "cookbook") return generateCookBookDisplay();
+      if (category === "transit") return generateTransitDisplay();
       return scene.display ? normalizeSceneDisplay(scene.display) : fallback;
     };
 
@@ -352,13 +358,16 @@ export class Store {
     }
     const created: Scene = {
       id: randomUUID(),
-      name: scene.name ?? (category === "cookbook" ? "CookBook" : "Neue Szene"),
+      name:
+        scene.name ??
+        (category === "cookbook" ? "CookBook" : category === "transit" ? "Fahrplan" : "Neue Szene"),
       category,
       display: resolveDisplay([]),
       buttons: scene.buttons ?? [],
       groups: scene.groups ?? [],
       triggers: scene.triggers ?? [],
       cookbook: scene.cookbook,
+      transit: category === "transit" ? normalizeTransitConfig(scene.transit) : undefined,
       createdAt: now,
       updatedAt: now,
     };

@@ -24,7 +24,15 @@ import { AutomationRuntime } from "./AutomationRuntime.js";
 import { deployFingerprint, DeviceConfigBuilder, DeviceConfigOutput } from "./DeviceConfigBuilder.js";
 import { VariableState } from "../engine/variables.js";
 import { BPConfig } from "../buttonplus/types.js";
-import { ConfigDialect, detectDialect, toCanonical, toDevice } from "../buttonplus/schema.js";
+import {
+  CONFIGSAVE_LIMIT_BYTES,
+  ConfigDialect,
+  compactForDevice,
+  configPayloadBytes,
+  detectDialect,
+  toCanonical,
+  toDevice,
+} from "../buttonplus/schema.js";
 import { ensureBrokers } from "../buttonplus/brokers.js";
 
 /**
@@ -189,11 +197,24 @@ export class DeviceManager {
    */
   async pushConfig(config: BPConfig): Promise<string> {
     const client = this.createDeviceClient();
-    const deviceFormat = toDevice(config, this.dialect);
     // `info` (mac, firmware, Connector-/Sensor-Hardware) ist geräteeigen und wird
     // beim Speichern NICHT benötigt. Die offizielle App entfernt es ebenfalls vor
     // `/configsave`; das spart Bytes gegen das feste Payload-Limit des Geräts.
-    delete (deviceFormat as Record<string, unknown>).info;
+    // Zusätzlich leere Felder weglassen (compactForDevice).
+    const { info: _info, ...withoutInfo } = toDevice(config, this.dialect);
+    const deviceFormat = compactForDevice(withoutInfo);
+
+    // Über dem Limit verwirft das Gerät die Konfiguration (HTTP 413) – vorher
+    // mit klarer Meldung abbrechen statt halb zu deployen.
+    const bytes = configPayloadBytes(deviceFormat);
+    const kb = (n: number) => (n / 1024).toFixed(1).replace(".", ",");
+    console.log(`[Deploy] Config-Größe ${bytes} B (Limit ${CONFIGSAVE_LIMIT_BYTES} B)`);
+    if (bytes > CONFIGSAVE_LIMIT_BYTES) {
+      throw new Error(
+        `Konfiguration zu groß für das Gerät: ${kb(bytes)} kB von max. ${kb(CONFIGSAVE_LIMIT_BYTES)} kB. ` +
+          `Weniger Seiten bzw. Display-Elemente verwenden.`,
+      );
+    }
     const result = await client.pushConfig(deviceFormat);
 
     this.deviceConfig = this.normalizeConfig(config);
@@ -290,14 +311,24 @@ export class DeviceManager {
     console.log("[Deploy] Waiting for device to apply config...");
     await this.waitForDeviceStable(2000);
 
-    // 4. Verification
+    // 4. Verification: hat das Gerät das neue Layout wirklich übernommen?
+    //    Ohne diesen Abgleich würde die Runtime auf ein Layout rendern, das
+    //    nicht auf dem Gerät liegt (Texte landen in fremden Display-Items).
+    const pushedLayout = layoutSignature(output.config);
+    let pulled = false;
     try {
       console.log("[Deploy] Verifying config on device...");
       await this.pullConfig();
-      output = this.compile();
+      pulled = true;
     } catch (err) {
       console.warn("[Deploy] Verification failed - using pushed config:", err);
     }
+    if (pulled && this.deviceConfig && layoutSignature(this.deviceConfig) !== pushedLayout) {
+      throw new Error(
+        "Das Gerät hat die neue Konfiguration nicht übernommen (Layout auf dem Gerät weicht ab). Bitte erneut deployen.",
+      );
+    }
+    if (pulled) output = this.compile();
 
     // 5. Runtime aktivieren. KEIN erzwungener Seitenwechsel hier – ein Sprung
     //    während das Gerät nach dem Config-Push neu bootet führt zu Desync
@@ -457,4 +488,22 @@ export class DeviceManager {
   getCompiledOutput(): DeviceConfigOutput | null {
     return this.compiledOutput;
   }
+}
+
+/**
+ * Kompakter Layout-Vergleichswert einer Gerätekonfig: Display-Items (ID +
+ * Seite) und Anzahl Buttons pro Seite. Dient nach dem Push als Nachweis, dass
+ * das Gerät die neue Konfiguration tatsächlich gespeichert hat. Positionen
+ * bewusst NICHT – die Firmware könnte Nachkommastellen anders speichern.
+ */
+function layoutSignature(cfg: BPConfig): string {
+  const displays = (cfg.mqttdisplays ?? [])
+    .map((d) => `${d.displayitemid ?? ""}@${d.page}`)
+    .sort();
+  const buttonsPerPage: Record<string, number> = {};
+  for (const b of cfg.mqttbuttons ?? []) {
+    const key = String(b.page ?? 0);
+    buttonsPerPage[key] = (buttonsPerPage[key] ?? 0) + 1;
+  }
+  return JSON.stringify({ displays, buttonsPerPage });
 }

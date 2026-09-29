@@ -36,6 +36,9 @@ export class DeviceClient {
       }),
       timeoutMs,
     );
+    if (res.status === 413) {
+      throw new Error("Speichern fehlgeschlagen: Konfiguration zu groß für das Gerät (HTTP 413).");
+    }
     if (!res.ok) throw new Error(`Speichern fehlgeschlagen: HTTP ${res.status}`);
     return await res.text();
   }

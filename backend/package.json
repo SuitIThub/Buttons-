@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "verify": "tsx verify-fixes.ts && tsx verify-runtime.ts"
+    "verify": "tsx verify-fixes.ts && tsx verify-runtime.ts && tsx verify-transit.ts"
   },
   "dependencies": {
     "@mdi/js": "^7.4.47",
@@ -19,6 +19,7 @@
     "fast-xml-parser": "^5.9.3",
     "jsep": "^1.4.0",
     "mqtt": "^5.10.1",
+    "qrcode-generator": "^1.5.2",
     "ws": "^8.18.0"
   },
   "devDependencies": {

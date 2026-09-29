@@ -20,6 +20,11 @@ import { EventType, ConnectorType, hexToDecimalColor } from "../buttonplus/const
 import { Page, Scene, VariableDef } from "../model.js";
 import { DisplayMapping } from "./SceneRenderer.js";
 
+/** CookBook/Fahrplan: Layout und Texte vollständig generiert (keine Einheiten, keine Top-Labels). */
+function isGeneratedScene(scene: Scene): boolean {
+  return scene.category === "cookbook" || scene.category === "transit";
+}
+
 export interface DeviceConfigInput {
   /** Basis-Config vom Gerät (wird geklont und modifiziert) */
   baseConfig: BPConfig;
@@ -158,10 +163,14 @@ export class DeviceConfigBuilder {
     const pageCount = Math.max(1, sortedPages.length);
 
     const usedByPage = new Map<number, Set<number>>();
+    // Seiten generierter Szenen (CookBook/Fahrplan) setzen nie ein Top-Label –
+    // dort entfällt das Toplabel-Topic (spart Config-Platz, siehe CONFIGSAVE_LIMIT_BYTES).
+    const noTopLabelPages = new Set<number>();
     for (const page of sortedPages) {
       const scene = page.sceneId ? sceneById.get(page.sceneId) : undefined;
       const devicePage = firmwareV2 ? page.order + 1 : page.order;
       usedByPage.set(devicePage, this.usedButtonPositions(scene, buttonCount, navButtons));
+      if (scene && isGeneratedScene(scene)) noTopLabelPages.add(devicePage);
     }
 
     // Display-Items und Mappings erstellen
@@ -196,10 +205,12 @@ export class DeviceConfigBuilder {
           label: "", // Wird zur Runtime gesetzt
           unit: element.unit ?? "",
           page: devicePage,
+          // Generierte Szenen (CookBook/Fahrplan) nutzen nie eine Einheit →
+          // kein Unit-Topic (spart Config-Platz).
           topics: [
             t(`${diBase}/label/set`, EventType.LABEL),
             t(`${diBase}/value/set`, EventType.VALUE),
-            t(`${diBase}/unit/set`, EventType.UNIT),
+            ...(isGeneratedScene(scene) ? [] : [t(`${diBase}/unit/set`, EventType.UNIT)]),
           ],
         });
 
@@ -228,7 +239,7 @@ export class DeviceConfigBuilder {
     // Buttons: V2/V3 heilt die bestehende Gerätekonfig (Positionen 1..N,
     // buttonid, front/wall-LEDs), Legacy erstellt eine neue Button-Config.
     config.mqttbuttons = firmwareV2
-      ? this.healV2Buttons(config.mqttbuttons ?? [], buttonCount, pageCount, baseTopic, deviceId, brokerId, usedByPage)
+      ? this.healV2Buttons(config.mqttbuttons ?? [], buttonCount, pageCount, baseTopic, deviceId, brokerId, usedByPage, noTopLabelPages)
       : this.buildLegacyButtons(baseTopic, deviceId, buttonCount, brokerId);
 
     // Sensoren: die direkt am Gerät eingerichtete Konfig (sensorid/type/interval)
@@ -275,7 +286,8 @@ export class DeviceConfigBuilder {
    * Genutzte Button-Positionen (1-basiert) einer Szene für eine Seite.
    * Immer enthalten: die Navigations-Buttons (Blättern muss überall gehen).
    * Custom: gebundene Buttons + Button-Trigger. CookBook: alle Positionen
-   * (Nav + Pagination 3-4 + Item-Buttons 5-8).
+   * (Nav + Pagination 3-4 + Item-Buttons 5-8). Fahrplan: alle Positionen
+   * (Route-Buttons bzw. Ansichts-Steuerung auf 3-8).
    */
   private static usedButtonPositions(
     scene: Scene | undefined,
@@ -288,7 +300,7 @@ export class DeviceConfigBuilder {
       used.add(nav.next + 1);
     }
     if (!scene) return used;
-    if (scene.category === "cookbook") {
+    if (scene.category === "cookbook" || scene.category === "transit") {
       for (let p = 1; p <= buttonCount; p++) used.add(p);
       return used;
     }
@@ -309,6 +321,7 @@ export class DeviceConfigBuilder {
     deviceId: string,
     brokerId: string,
     usedByPage: Map<number, Set<number>>,
+    noTopLabelPages: Set<number> = new Set(),
   ): BPButton[] {
     // Bestehende Buttons nach Position indizieren (verschmutzte/ungültige
     // ignorieren). Der erste Treffer pro Position (typisch Seite 1) dient als
@@ -337,8 +350,11 @@ export class DeviceConfigBuilder {
           buttonid: `${position}-${page}`,
           position,
           page,
-          label: src?.label ?? "",
-          toplabel: src?.toplabel ?? "",
+          // Texte kommen ausschließlich zur Laufzeit per MQTT. NIE aus der alten
+          // Gerätekonfig übernehmen – die Firmware füllt fehlende Felder mit
+          // Werkstexten (Pos. 8: „Button+ Like“), die sonst dauerhaft kleben.
+          label: "",
+          toplabel: "",
           // SVG wird ausschließlich zur Laufzeit publiziert. NIE aus der alten
           // Gerätekonfig übernehmen — sonst zeigt der Button nach einem Reboot
           // ein Phantom-Icon, obwohl in der Szene keins (mehr) gesetzt ist.
@@ -348,7 +364,7 @@ export class DeviceConfigBuilder {
           // Label-Topics auf JEDER Seite — das Gerät bindet Subscriptions an
           // die jeweilige Button-Definition, d.h. ohne Topic auf Seite 2 zeigt
           // der Button dort keinen Label-Inhalt.
-          topics: this.buttonLabelTopics(baseTopic, deviceId, position, brokerId),
+          topics: this.buttonLabelTopics(baseTopic, deviceId, position, brokerId, !noTopLabelPages.has(page)),
           leds: this.healLeds(src?.leds),
         });
       }
@@ -383,7 +399,8 @@ export class DeviceConfigBuilder {
    * Erzeugt Button-Subscription-Topics gemäß MQTT-TOPICS-REFERENCE.md.
    *
    * Nur Label/TopLabel — die einzigen Topics, die das Gerät zum Empfangen
-   * von Inhalten über MQTT braucht. Click/LongPress werden für V2/V3 über
+   * von Inhalten über MQTT braucht (TopLabel entfällt auf Seiten generierter
+   * Szenen, `withTopLabel = false`). Click/LongPress werden für V2/V3 über
    * den eingebauten `pushbutton`-Mechanismus gesendet und brauchen keine
    * Config-Topics. LEDs/SVG verwenden ebenfalls eingebaute Topics.
    *
@@ -394,12 +411,16 @@ export class DeviceConfigBuilder {
     deviceId: string,
     position: number, // 1-basiert!
     brokerId: string,
+    withTopLabel = true,
   ): BPTopic[] {
     const b = `${baseTopic}/${deviceId}/button/${position}`;
-    return [
+    const topics: BPTopic[] = [
       { brokerid: brokerId, topic: `${b}/label/set`, payload: "", eventtype: EventType.LABEL },
-      { brokerid: brokerId, topic: `${b}/toplabel/set`, payload: "", eventtype: EventType.TOPLABEL },
     ];
+    if (withTopLabel) {
+      topics.push({ brokerid: brokerId, topic: `${b}/toplabel/set`, payload: "", eventtype: EventType.TOPLABEL });
+    }
+    return topics;
   }
 
   /**

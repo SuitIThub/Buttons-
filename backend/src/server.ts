@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { promises as fs } from "node:fs";
 import { DeviceManager } from "./device/index.js";
 import { searchIcons, lookupIcons } from "./device/IconResolver.js";
+import { gvh } from "./transit/GvhClient.js";
 import { AppSettings } from "./buttonplus/types.js";
 import { evaluate, interpolate } from "./engine/expr.js";
 
@@ -282,6 +283,21 @@ export async function buildServer(manager: DeviceManager): Promise<Server> {
       const limitRaw = Number(req.query.limit);
       const limit = Number.isFinite(limitRaw) ? Math.min(500, Math.max(1, Math.trunc(limitRaw))) : 100;
       res.json(searchIcons(String(req.query.q ?? ""), limit));
+    }),
+  );
+
+  // ---- Fahrplan (GVH/HAFAS) --------------------------------------------------
+  // Haltestellensuche für den Fahrplan-Szenentyp: /api/transit/stops?q=Kröpcke
+  api.get(
+    "/transit/stops",
+    asyncHandler(async (req, res) => {
+      const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+      if (q.length < 2) return res.status(400).json({ error: "Suchbegriff (q) mit mind. 2 Zeichen nötig" });
+      try {
+        res.json(await gvh.searchStops(q, 10));
+      } catch (err) {
+        res.status(502).json({ error: (err as Error).message });
+      }
     }),
   );
 
